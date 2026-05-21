@@ -82,6 +82,11 @@ If the best qmd score is < 0.3 **and** the index scan also turned up nothing rel
 
 This is valuable signal: it means the question has revealed a hole in the knowledge base. (If the index scan found something the search missed, that's a cross-referencing gap to note — not a content gap.)
 
+If the topic is related to a registered NotebookLM notebook (check `wiki/nlm-notebooks.md`), also include:
+> "wiki gap detected — consider running wiki-nlm-research: '<question>' --topic <relevant-topic>"
+
+Replace `<relevant-topic>` with the matching Topic Folder from the registry, or leave as a placeholder if the registry is empty or no topic matches.
+
 ### 7. Offer to file the answer
 
 If the answer is non-trivial — a comparison, an analysis, a synthesis across multiple pages, a connection the human hadn't made explicit — offer to save it as a new wiki page:
