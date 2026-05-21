@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "llm-wiki@llm-wiki-local": true
+  }
+}

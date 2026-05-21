@@ -1,0 +1,11 @@
+{
+  "name": "llm-wiki",
+  "description": "Skills for operating the LLM-maintained personal wiki: ingest sources, query the wiki, and lint for health issues.",
+  "version": "1.0.0",
+  "author": {
+    "name": "hllj",
+    "email": "vanhop3499@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": ["wiki", "knowledge-base", "ingest", "query", "lint", "llm"]
+}

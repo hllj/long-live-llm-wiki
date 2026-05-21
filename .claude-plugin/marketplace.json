@@ -1,0 +1,15 @@
+{
+  "name": "llm-wiki-local",
+  "plugins": [
+    {
+      "name": "llm-wiki",
+      "source": "./",
+      "description": "Skills for operating the LLM-maintained personal wiki: ingest sources, query the wiki, and lint for health issues.",
+      "version": "1.0.0"
+    }
+  ],
+  "owner": {
+    "name": "hllj",
+    "email": "vanhop3499@gmail.com"
+  }
+}
