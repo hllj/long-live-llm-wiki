@@ -3,6 +3,7 @@
 **Spec:** `docs/specs/001-wiki-notebooklm/spec.md`  
 **Date:** 2026-05-22  
 **Status:** Approved  
+**Version:** 1.1.0 — adds auth, profiles, discover, source-describe, drive-sync  
 
 ---
 
@@ -407,6 +408,31 @@ user decide what enters the wiki.
 ```bash
 ln -s ../../skills/wiki-nlm-research .claude-plugin/skills/wiki-nlm-research
 ```
+
+---
+
+### Phase 2b — Rewrite `wiki-nlm-sync` with v1.1.0 additions
+
+Rewrites the existing `skills/wiki-nlm-sync/SKILL.md` to add:
+- Proactive auth check (`nlm login --check`) at the top of every workflow
+- Dedicated **authenticate** sub-workflow (FR-7, FR-8, US-8, US-9)
+- **Discover** sub-workflow — `nlm research` web/drive source discovery (FR-9, US-10)
+- **Drive-sync** sub-workflow — `nlm source stale` / `nlm source sync` (FR-11, US-12)
+- `nlm source describe` offered before artifact selection in pull workflow (FR-10, US-11)
+- Profile support (`--profile`) in all auth steps (FR-8)
+
+Full rewrite of `skills/wiki-nlm-sync/SKILL.md`. Symlink unchanged.
+
+---
+
+### Phase 3b — Rewrite `wiki-nlm-research` with v1.1.0 additions
+
+Rewrites the existing `skills/wiki-nlm-research/SKILL.md` to add:
+- Proactive auth check before any `nlm` operation (FR-7, US-8)
+- `nlm source describe` offered before artifact pull (FR-10, US-11)
+- Profile support in auth hint messages (FR-8)
+
+Full rewrite of `skills/wiki-nlm-research/SKILL.md`. Symlink unchanged.
 
 ---
 

@@ -3,6 +3,7 @@
 **ID:** 001-wiki-notebooklm  
 **Date:** 2026-05-22  
 **Status:** Approved  
+**Version:** 1.1.0  
 
 ---
 
@@ -142,6 +143,74 @@
 
 ---
 
+### US-8: Authenticate to NotebookLM
+
+**As a** researcher whose NotebookLM session has expired or never been set up,  
+**I want** the skill to detect an invalid session and guide me through login before continuing,  
+**so that** I never hit a silent auth failure mid-workflow.
+
+**Acceptance criteria:**
+- Before any `nlm` operation, the skill runs `nlm login --check` to test session validity.
+- If the session is invalid, the skill pauses and prompts: `"Session invalid — run nlm login [--profile <name>] to authenticate, then retry."`
+- `wiki-nlm-sync` exposes an explicit "authenticate" sub-workflow that runs `nlm login`, optionally with a profile name, then confirms with `nlm auth status`.
+- Session lifetime warning is surfaced: `"NotebookLM sessions expire in ~20 minutes."`
+
+---
+
+### US-9: Use named profiles for multiple Google accounts
+
+**As a** researcher with more than one Google account,  
+**I want** to specify a named profile when authenticating,  
+**so that** I can keep multiple NotebookLM accounts separate.
+
+**Acceptance criteria:**
+- Auth steps in both skills accept an optional `--profile <name>` argument passed to `nlm login`.
+- When listing notebooks, the skill notes which profile is active (`nlm auth list`).
+- If no profile is specified, the default profile is used without error.
+
+---
+
+### US-10: Discover new web sources for a notebook
+
+**As a** researcher who wants to enrich a NotebookLM notebook with new web content,  
+**I want** to run a web research query and import discovered sources directly into the notebook,  
+**so that** the notebook stays current without manual URL hunting.
+
+**Acceptance criteria:**
+- `wiki-nlm-sync` exposes a "discover" sub-workflow that accepts a search query and a topic.
+- The skill supports three research modes: fast web (default), deep web (`--mode deep`), and Google Drive (`--source drive`).
+- Discovered sources are listed before import; the user selects which to import (all or subset).
+- After import, the registry "Last Synced" date is updated.
+
+---
+
+### US-11: Preview a source before pulling
+
+**As a** researcher deciding which NotebookLM artifacts to pull,  
+**I want** to see an AI summary and keywords for each artifact before committing to download it,  
+**so that** I don't fill `raw/<topic>/` with content I don't need.
+
+**Acceptance criteria:**
+- In the pull artifact step (both skills), before asking the user to select artifacts, the skill offers to describe each one via `nlm source describe <id>`.
+- The description shows AI summary + keywords in the conversation.
+- The user can skip description and go straight to selection.
+
+---
+
+### US-12: Sync stale Google Drive sources
+
+**As a** researcher whose Drive documents have been updated since they were added to NotebookLM,  
+**I want** to refresh stale Drive sources in one step,  
+**so that** the notebook reflects the latest version of my documents.
+
+**Acceptance criteria:**
+- `wiki-nlm-sync` exposes a "drive-sync" sub-workflow that lists stale Drive sources via `nlm source stale <alias>`.
+- The user can sync all stale sources or select specific ones.
+- Sync runs via `nlm source sync <alias> --confirm [--source-ids <ids>]`.
+- After sync, the registry "Last Synced" date is updated.
+
+---
+
 ## Functional Requirements
 
 ### FR-1: Notebook registry (`wiki/nlm-notebooks.md`)
@@ -181,6 +250,44 @@
 
 ---
 
+### FR-7: Proactive authentication check
+
+- Both skills run `nlm login --check` before the first `nlm` operation in any workflow.
+- If the check fails, the skill halts and displays: `"Session invalid — run nlm login [--profile <name>] to authenticate, then retry."`
+- `wiki-nlm-sync` includes a dedicated "authenticate" sub-workflow: `nlm login [--profile <name>]` → confirm with `nlm auth status`.
+- Sessions expire in ~20 minutes; the skill surfaces this as a warning on auth success.
+
+### FR-8: Profile support
+
+- Both skills accept an optional profile name in all auth-related steps.
+- Profile is passed as `--profile <name>` to `nlm login`.
+- `wiki-nlm-sync` list-notebooks workflow shows active profile via `nlm auth list`.
+
+### FR-9: Discover sub-workflow (`wiki-nlm-sync`)
+
+- Accepts a search query and topic name as inputs.
+- Supports three modes: fast web (default), deep web (`--mode deep`), Drive (`--source drive`).
+- Runs `nlm research start "<query>" --notebook-id <alias> [--mode deep] [--source drive]`.
+- Polls status via `nlm research status <alias>` until complete.
+- Presents discovered sources; user selects which to import.
+- Imports via `nlm research import <alias> <task-id> [--indices <n,n,...>]`.
+- Updates `wiki/nlm-notebooks.md` Last Synced after import.
+
+### FR-10: Source description before pull
+
+- In the artifact selection step of both skills, the skill offers `nlm source describe <id>` for each artifact.
+- Description output (AI summary + keywords) is displayed in conversation.
+- User may skip description; selection proceeds either way.
+
+### FR-11: Drive sync sub-workflow (`wiki-nlm-sync`)
+
+- Lists stale Drive sources via `nlm source stale <alias>`.
+- User selects all or specific sources to refresh.
+- Syncs via `nlm source sync <alias> --confirm [--source-ids <ids>]`.
+- Updates `wiki/nlm-notebooks.md` Last Synced after sync.
+
+---
+
 ## Non-Functional Requirements
 
 - **No new dependencies** beyond `nlm` CLI — no Python packages, no new config files beyond `wiki/nlm-notebooks.md`.
@@ -199,6 +306,10 @@
 | `nlm` auth expired | Surface `nlm` error output, suggest `nlm login` |
 | Notebook has no artifacts | Skip artifact selection step, say so explicitly |
 | `raw/<topic>/` does not exist on pull | Create the directory, then save the file |
+| `nlm login --check` fails | Halt, display login prompt with profile hint, exit |
+| Profile name not found | Surface `nlm` error, list available profiles via `nlm auth list` |
+| `nlm research` still running when status polled | Keep polling with progress message every 10s |
+| No stale Drive sources found | Say so explicitly, skip sync |
 | PDF in push selection | Skip the PDF, warn user, continue with remaining files |
 | Duplicate artifact filename on pull | Append counter suffix, save, report the actual filename used |
 

@@ -26,6 +26,16 @@ nlm --version
 If not found, stop and tell the user:
 > "`nlm` CLI not found. Install it with: `uv tool install notebooklm-mcp-cli`"
 
+Then verify the session is valid:
+
+```bash
+nlm login --check
+```
+
+If the check fails, stop and tell the user:
+> "Session invalid — run `nlm login [--profile <name>]` to authenticate, then retry.
+> Note: NotebookLM sessions expire in ~20 minutes."
+
 ## Inputs
 
 The user provides:
@@ -55,7 +65,8 @@ nlm notebook query <alias> "<question>"
 Display the full cited answer in the conversation.
 
 If `nlm` returns an auth error:
-> "NotebookLM session expired. Run `nlm login` to re-authenticate, then retry."
+> "NotebookLM session expired. Run `nlm login [--profile <name>]` to
+> re-authenticate, then retry."
 
 ### 3. List available artifacts
 
@@ -71,6 +82,15 @@ Skip to step 5.
 
 ### 4. Offer to pull artifacts
 
+**First, offer source descriptions**: Before selection, ask:
+> "Want a summary of any artifact before selecting? (enter number or 'no')"
+If yes:
+```bash
+nlm source describe <artifact-id>
+```
+Display AI summary + keywords. Repeat for any artifact the user asks about.
+
+**Then ask for selection**:
 > "Which artifacts do you want to pull into `raw/<topic>/`?
 > (Enter numbers, 'all', or 'none')"
 
@@ -103,7 +123,7 @@ Always append this entry — even if no artifacts were pulled.
 
 After this skill runs, the user should have:
 1. Seen a cited NotebookLM answer to their question
-2. A clear list of available artifacts
+2. A clear list of available artifacts with optional AI summaries
 3. Any selected artifacts saved to `raw/<topic>/`, ready for `wiki-ingest`
 4. A log entry recording what happened
 
