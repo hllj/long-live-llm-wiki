@@ -3,7 +3,7 @@
 **ID:** 001-wiki-notebooklm  
 **Date:** 2026-05-22  
 **Status:** Approved  
-**Version:** 1.1.0  
+**Version:** 1.2.0  
 
 ---
 
@@ -43,16 +43,19 @@
 
 ## User Stories
 
-### US-1: Gap escalation from wiki-query
+### US-1: Gap escalation from wiki-query (seamless handoff)
 
 **As a** researcher whose `wiki-query` returns a gap (score < 0.3),  
-**I want** the gap message to suggest the exact `wiki-nlm-research` command to run,  
-**so that** I know immediately what to do next without switching context.
+**I want** wiki-query to automatically proceed through wiki-nlm-research, suggest ingest, and offer to re-query in the same conversation,  
+**so that** the wiki self-improves in one uninterrupted flow without me switching context or typing extra commands.
 
 **Acceptance criteria:**
-- When `wiki-query` scores all results below 0.3, the response includes a suggested next step referencing `wiki-nlm-research` with the same question.
-- The suggestion includes a `--topic` placeholder showing which topic folder to specify.
-- The existing `wiki-query` skill file is not modified; the gap suggestion is part of `wiki-query`'s existing gap-handling section (via additive instruction in the skill).
+- When `wiki-query` scores all results below 0.3 and a matching topic exists in `wiki/nlm-notebooks.md`, the skill announces the gap and immediately begins the wiki-nlm-research workflow inline (same conversation — no separate command from the user).
+- The topic folder is inferred from the registry or asked for if ambiguous; the user is not required to type a separate invocation.
+- After any artifacts are pulled to `raw/<topic>/`, wiki-query tells the user the exact `wiki-ingest` command to run.
+- After `wiki-ingest` completes, wiki-query offers to re-run with the original question; if the user accepts, it re-executes and reports the updated results.
+- The loop terminates when the wiki can answer (score ≥ 0.3 on re-query) or the user declines to continue.
+- If no matching topic is registered, the gap message falls back to the previous suggestion format (no inline execution).
 
 ---
 
@@ -237,10 +240,20 @@
 - If a file with that name already exists, the skill appends a counter: `nlm-report-2026-05-22-2.md`.
 - Content is saved as-is; no preprocessing or reformatting is applied.
 
-### FR-5: wiki-query gap suggestion
+### FR-5: wiki-query gap handoff
 
-- The gap suggestion is added to the `wiki-query` skill's SKILL.md as an additive instruction (not a replacement).
-- The suggestion format: `"wiki gap detected — consider running wiki-nlm-research: '<question>' --topic <relevant-topic>"`.
+- An additive instruction block is appended to step 5 (Handle low-confidence results) of `wiki-query/SKILL.md`. No existing behavior is removed or replaced.
+- When all results score below 0.3 and a matching topic exists in `wiki/nlm-notebooks.md`, wiki-query announces the gap and executes the wiki-nlm-research workflow **inline** (seamless handoff — no separate user command required).
+- Topic resolution: infer from the registry if unambiguous; ask the user to pick if multiple topics match; fall back to suggestion-only format if no topic is registered.
+- After artifacts are pulled, wiki-query states the exact `wiki-ingest` invocation.
+- After ingest, wiki-query offers to re-run with the original question (one prompt — user says yes or no).
+- The loop terminates after one re-query or when the user declines.
+
+### FR-12: Re-query loop termination
+
+- After re-running wiki-query post-ingest, report updated results normally.
+- If the re-query still scores below 0.3, report the still-open gap and stop — do not recurse a second time without explicit user request.
+- Never loop more than once automatically; further research cycles require a fresh user prompt.
 
 ### FR-6: nlm CLI dependency
 

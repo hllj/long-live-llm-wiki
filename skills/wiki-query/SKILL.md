@@ -82,10 +82,34 @@ If the best qmd score is < 0.3 **and** the index scan also turned up nothing rel
 
 This is valuable signal: it means the question has revealed a hole in the knowledge base. (If the index scan found something the search missed, that's a cross-referencing gap to note — not a content gap.)
 
-If the topic is related to a registered NotebookLM notebook (check `wiki/nlm-notebooks.md`), also include:
-> "wiki gap detected — consider running wiki-nlm-research: '<question>' --topic <relevant-topic>"
+**NotebookLM gap handoff (seamless):**
 
-Replace `<relevant-topic>` with the matching Topic Folder from the registry, or leave as a placeholder if the registry is empty or no topic matches.
+If all results score below 0.3:
+
+1. Check `wiki/nlm-notebooks.md` for a topic folder matching the question's subject.
+   - If no matching topic is registered: fall back to the existing gap message only. Do not attempt inline execution.
+   - If one topic matches: use it.
+   - If multiple topics could match: ask the user which topic to use before proceeding.
+
+2. Announce the handoff:
+   > "wiki gap detected — proceeding with wiki-nlm-research to find sources for '<question>'."
+
+3. Execute the **full wiki-nlm-research workflow inline** (same conversation, no separate command):
+   - Resolve the topic alias from the registry.
+   - Run `nlm login --check`; halt with auth message if it fails.
+   - Query NotebookLM: `nlm notebook query <alias> "<question>"`
+   - List artifacts: `nlm studio status <alias>`
+   - Offer source descriptions, then ask which artifacts to pull.
+   - Save pulled artifacts to `raw/<topic>/`.
+
+4. After any artifacts are saved, tell the user:
+   > "Pulled to `raw/<topic>/`. Run `wiki-ingest` on `raw/<topic>/<filename>` to integrate into the wiki."
+
+5. After wiki-ingest completes, offer exactly once:
+   > "Want me to re-run wiki-query with the original question now that the wiki has been updated? (yes/no)"
+   - If yes: re-execute wiki-query with the original question and report results.
+   - If no: stop.
+   - If re-query still scores below 0.3: report the still-open gap and stop — do not loop again.
 
 ### 7. Offer to file the answer
 

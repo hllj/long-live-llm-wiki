@@ -3,6 +3,7 @@
 **Spec:** `docs/specs/001-wiki-notebooklm/spec.md`  
 **Plan:** `docs/specs/001-wiki-notebooklm/plan.md`  
 **Date:** 2026-05-22  
+**Version:** 1.2.0  
 
 `[P]` = safe to run concurrently with other `[P]` tasks in the same group (different files, no shared deps).
 
@@ -55,7 +56,7 @@ Expected: line containing `"The wiki doesn't have strong coverage"` and `wiki ga
 
 ---
 
-### T05 — Add NotebookLM escalation hint to `wiki-query/SKILL.md` step 5
+### T05 — Add seamless NotebookLM gap handoff to `wiki-query/SKILL.md` step 5
 
 In `/Users/hllj/Projects/LLM-Wiki-Notebook/skills/wiki-query/SKILL.md`, locate step 5's existing gap message block ending with:
 
@@ -63,13 +64,37 @@ In `/Users/hllj/Projects/LLM-Wiki-Notebook/skills/wiki-query/SKILL.md`, locate s
 > "The wiki doesn't have strong coverage of this topic (best match score: 0.XX). This looks like a gap — want me to web-search and ingest a new source, or do you have a document to add to `raw/`?"
 ```
 
-Append the following paragraph immediately after that block (before the line starting `This is valuable signal:`):
+Append the following block immediately after that block (before the line starting `This is valuable signal:`):
 
 ```markdown
-If the topic is related to a registered NotebookLM notebook (check `wiki/nlm-notebooks.md`), also include:
-> "wiki gap detected — consider running wiki-nlm-research: '<question>' --topic <relevant-topic>"
+**NotebookLM gap handoff (seamless):**
 
-Replace `<relevant-topic>` with the matching Topic Folder from the registry, or leave as a placeholder if the registry is empty or no topic matches.
+If all results score below 0.3:
+
+1. Check `wiki/nlm-notebooks.md` for a topic folder matching the question's subject.
+   - If no matching topic is registered: fall back to the existing gap message only. Do not attempt inline execution.
+   - If one topic matches: use it.
+   - If multiple topics could match: ask the user which topic to use before proceeding.
+
+2. Announce the handoff:
+   > "wiki gap detected — proceeding with wiki-nlm-research to find sources for '<question>'."
+
+3. Execute the **full wiki-nlm-research workflow inline** (same conversation, no separate command):
+   - Resolve the topic alias from the registry.
+   - Run `nlm login --check`; halt with auth message if it fails.
+   - Query NotebookLM: `nlm notebook query <alias> "<question>"`
+   - List artifacts: `nlm studio status <alias>`
+   - Offer source descriptions, then ask which artifacts to pull.
+   - Save pulled artifacts to `raw/<topic>/`.
+
+4. After any artifacts are saved, tell the user:
+   > "Pulled to `raw/<topic>/`. Run `wiki-ingest` on `raw/<topic>/<filename>` to integrate into the wiki."
+
+5. After wiki-ingest completes, offer exactly once:
+   > "Want me to re-run wiki-query with the original question now that the wiki has been updated? (yes/no)"
+   - If yes: re-execute wiki-query with the original question and report results.
+   - If no: stop.
+   - If re-query still scores below 0.3: report the still-open gap and stop — do not loop again.
 ```
 
 ---
@@ -77,10 +102,12 @@ Replace `<relevant-topic>` with the matching Topic Folder from the registry, or 
 ### T06 — Verify wiki-query gap section after change
 
 ```bash
-grep -A 5 "wiki gap detected" /Users/hllj/Projects/LLM-Wiki-Notebook/skills/wiki-query/SKILL.md
+grep -A 3 "wiki gap detected" /Users/hllj/Projects/LLM-Wiki-Notebook/skills/wiki-query/SKILL.md
+grep "nlm login --check" /Users/hllj/Projects/LLM-Wiki-Notebook/skills/wiki-query/SKILL.md
+grep "re-run wiki-query" /Users/hllj/Projects/LLM-Wiki-Notebook/skills/wiki-query/SKILL.md
 ```
 
-Expected: output shows the new `wiki gap detected` line and the `--topic` placeholder text. Existing gap message is still present above it.
+Expected: first grep shows the "wiki gap detected" announce line and "proceeding with wiki-nlm-research" text; second confirms the auth check is included; third confirms the re-query offer is present. Existing gap message is still present above the new block.
 
 ---
 

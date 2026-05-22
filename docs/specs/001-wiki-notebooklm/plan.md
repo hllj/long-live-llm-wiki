@@ -3,7 +3,7 @@
 **Spec:** `docs/specs/001-wiki-notebooklm/spec.md`  
 **Date:** 2026-05-22  
 **Status:** Approved  
-**Version:** 1.1.0 — adds auth, profiles, discover, source-describe, drive-sync  
+**Version:** 1.2.0 — adds seamless gap→research→ingest→re-query loop in wiki-query  
 
 ---
 
@@ -80,15 +80,39 @@ _Maintained by wiki-nlm-sync. Maps local `raw/<topic>/` folders to NotebookLM no
 |---|---|---|---|
 ```
 
-#### 1.2 Update `skills/wiki-query/SKILL.md` — additive gap suggestion
+#### 1.2 Update `skills/wiki-query/SKILL.md` — seamless gap handoff
 
-In the existing **step 5 (Handle low-confidence results)** section, append the following paragraph immediately after the existing gap message block:
+In the existing **step 5 (Handle low-confidence results)** section, append the following block immediately after the existing gap message block:
 
 ```markdown
-If the topic is related to a registered NotebookLM notebook (check `wiki/nlm-notebooks.md`), also suggest:
-> "wiki gap detected — consider running wiki-nlm-research: '<question>' --topic <relevant-topic>"
+**NotebookLM gap handoff (seamless):**
 
-Replace `<relevant-topic>` with the matching Topic Folder from the registry, or leave as a placeholder if the registry is empty or no topic matches.
+If all results score below 0.3:
+
+1. Check `wiki/nlm-notebooks.md` for a topic folder matching the question's subject.
+   - If no matching topic is registered: fall back to the existing gap message only. Do not attempt inline execution.
+   - If one topic matches: use it.
+   - If multiple topics could match: ask the user which topic to use before proceeding.
+
+2. Announce the handoff:
+   > "wiki gap detected — proceeding with wiki-nlm-research to find sources for '<question>'."
+
+3. Execute the **full wiki-nlm-research workflow inline** (same conversation, no separate command):
+   - Resolve the topic alias from the registry.
+   - Run `nlm login --check`; halt with auth message if it fails.
+   - Query NotebookLM: `nlm notebook query <alias> "<question>"`
+   - List artifacts: `nlm studio status <alias>`
+   - Offer source descriptions, then ask which artifacts to pull.
+   - Save pulled artifacts to `raw/<topic>/`.
+
+4. After any artifacts are saved, tell the user:
+   > "Pulled to `raw/<topic>/`. Run `wiki-ingest` on `raw/<topic>/<filename>` to integrate into the wiki."
+
+5. After wiki-ingest completes, offer exactly once:
+   > "Want me to re-run wiki-query with the original question now that the wiki has been updated? (yes/no)"
+   - If yes: re-execute wiki-query with the original question and report results.
+   - If no: stop.
+   - If re-query still scores below 0.3: report the still-open gap and stop — do not loop again.
 ```
 
 ---
@@ -448,9 +472,13 @@ After creating both symlinks, run `/reload-plugins` in Claude Code and confirm b
 
 Trigger `wiki-nlm-sync` → "list notebooks" — confirm it creates `wiki/nlm-notebooks.md` if missing and displays the empty table.
 
-#### 4.3 Verify gap suggestion in wiki-query
+#### 4.3 Verify seamless gap handoff in wiki-query
 
-Ask a question with no wiki coverage — confirm the response includes the `wiki-nlm-research` suggestion with `--topic` placeholder.
+Ask a question with no wiki coverage (score < 0.3) while a matching topic exists in `wiki/nlm-notebooks.md`. Confirm:
+- wiki-query announces the gap and immediately begins wiki-nlm-research steps (no separate command required).
+- After pull, it states the `wiki-ingest` command.
+- After ingest, it offers to re-run the original query.
+- If no topic is registered, confirm it falls back to the old suggestion-only message.
 
 #### 4.4 Verify full pipeline (requires `nlm` installed)
 
@@ -477,7 +505,8 @@ wiki-ingest raw/<topic>/<artifact>
 - FR-2 (topic resolution) → Phase 2 push step 1, Phase 3 step 1 ✓
 - FR-3 (push behavior) → Phase 2 push steps 5–6 ✓
 - FR-4 (pull behavior) → Phase 2 pull step 4, Phase 3 step 4 ✓
-- FR-5 (gap suggestion) → Phase 1.2 ✓
+- FR-5 (gap handoff) → Phase 1.2 ✓
+- FR-12 (re-query loop termination) → Phase 1.2 step 5 ✓
 - FR-6 (nlm CLI check) → Phase 2 prerequisites, Phase 3 prerequisites ✓
 - US-1 → Phase 1.2 ✓ | US-2 → Phase 3 steps 1–2 ✓ | US-3 → Phase 3 steps 3–4 ✓
 - US-4 → Phase 3 step 5 ✓ | US-5 → Phase 2 push ✓ | US-6 → Phase 2 create ✓
