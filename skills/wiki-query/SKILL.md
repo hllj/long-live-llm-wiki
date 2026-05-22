@@ -76,36 +76,18 @@ Prefer wiki page links over raw source links. The wiki pages are the compiled kn
 
 ### 5. Handle low-confidence results
 
-If the best qmd score is < 0.3 **and** the index scan also turned up nothing relevant, do not guess or extrapolate:
+If the best qmd score is < 0.3 **and** the index scan also turned up nothing relevant, do not guess or extrapolate. This is valuable signal: it means the question has revealed a hole in the knowledge base. (If the index scan found something the search missed, that's a cross-referencing gap to note — not a content gap.)
 
-> "The wiki doesn't have strong coverage of this topic (best match score: 0.XX). This looks like a gap — want me to web-search and ingest a new source, or do you have a document to add to `raw/`?"
+**Web search gap handoff (seamless):**
 
-This is valuable signal: it means the question has revealed a hole in the knowledge base. (If the index scan found something the search missed, that's a cross-referencing gap to note — not a content gap.)
+1. Announce the gap:
+   > "The wiki doesn't have strong coverage of this topic (best match score: 0.XX). This looks like a gap — want me to web-search and ingest a new source, or do you have a document to add to `raw/`?"
 
-**NotebookLM gap handoff (seamless):**
+2. If the user says yes to web search: use the WebSearch tool to find 2–3 relevant sources (papers, blog posts, docs). Present the results with titles and URLs and ask which to ingest.
 
-If all results score below 0.3:
+3. If the user provides a local file: proceed directly to `wiki-ingest`.
 
-1. Check `wiki/nlm-notebooks.md` for a topic folder matching the question's subject.
-   - If no matching topic is registered: fall back to the existing gap message only. Do not attempt inline execution.
-   - If one topic matches: use it.
-   - If multiple topics could match: ask the user which topic to use before proceeding.
-
-2. Announce the handoff:
-   > "wiki gap detected — proceeding with wiki-nlm-research to find sources for '<question>'."
-
-3. Execute the **full wiki-nlm-research workflow inline** (same conversation, no separate command):
-   - Resolve the topic alias from the registry.
-   - Run `nlm login --check`; halt with auth message if it fails.
-   - Query NotebookLM: `nlm notebook query <alias> "<question>"`
-   - List artifacts: `nlm studio status <alias>`
-   - Offer source descriptions, then ask which artifacts to pull.
-   - Save pulled artifacts to `raw/<topic>/`.
-
-4. After any artifacts are saved, tell the user:
-   > "Pulled to `raw/<topic>/`. Run `wiki-ingest` on `raw/<topic>/<filename>` to integrate into the wiki."
-
-5. After wiki-ingest completes, offer exactly once:
+4. After ingest completes, offer exactly once:
    > "Want me to re-run wiki-query with the original question now that the wiki has been updated? (yes/no)"
    - If yes: re-execute wiki-query with the original question and report results.
    - If no: stop.

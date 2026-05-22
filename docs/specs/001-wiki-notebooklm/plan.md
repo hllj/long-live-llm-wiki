@@ -1,27 +1,25 @@
-# Plan: Wiki ↔ NotebookLM Integration
+# Plan: Wiki Gap Research via Web Search
 
 **Spec:** `docs/specs/001-wiki-notebooklm/spec.md`  
 **Date:** 2026-05-22  
 **Status:** Approved  
-**Version:** 1.2.0 — adds seamless gap→research→ingest→re-query loop in wiki-query  
+**Version:** 2.0.0 — replaces NotebookLM integration with web-search gap handoff in wiki-query  
 
 ---
 
 ## Goal
 
-Implement two Claude Code skills (`wiki-nlm-sync` and `wiki-nlm-research`) that bridge the local wiki and Google NotebookLM, plus an additive gap suggestion in `wiki-query`. No runtime code — all deliverables are SKILL.md files and one markdown registry.
+Update `skills/wiki-query/SKILL.md` step 5 so that when the wiki has a gap (score < 0.3), the skill offers to web-search for sources, saves the chosen result to `raw/<topic>/`, and offers to re-query after ingest. No new skills, no new registry files, no external CLI dependencies.
 
 ---
 
 ## Architecture
 
-- **No new runtime code.** All deliverables are SKILL.md instruction files and one markdown registry file.
-- **`wiki/nlm-notebooks.md`** is the single source of truth mapping `raw/<topic>/` ↔ NotebookLM notebook alias.
-- **`nlm` CLI** (`notebooklm-mcp-cli`) is the only external dependency — assumed installed and authenticated by the user.
+- **No new skills.** The entire feature lives in step 5 of `skills/wiki-query/SKILL.md`.
+- **No new registry files.** `wiki/nlm-notebooks.md` remains as an empty placeholder (no content needed).
+- **Tools used:** `WebSearch` and `WebFetch` — both natively available in Claude Code.
 - **`wiki-ingest` is untouched.** It processes whatever lands in `raw/<topic>/` as always.
-- Plugin registration uses symlinks in `.claude-plugin/skills/` pointing to `../../skills/<name>` — same pattern as the three existing skills.
-
-> **Spec note:** The Non-Goals section says "no modification to wiki-query" while FR-5 explicitly specifies an additive gap suggestion in `wiki-query/SKILL.md`. FR-5 is more specific and reflects the agreed design — an additive-only addition to step 5 of the existing skill is implemented. No existing behaviour is removed or replaced.
+- **Removed:** `skills/wiki-nlm-sync/`, `skills/wiki-nlm-research/`, and all `.claude-plugin/skills/` symlinks for those skills.
 
 ---
 
@@ -29,10 +27,9 @@ Implement two Claude Code skills (`wiki-nlm-sync` and `wiki-nlm-research`) that 
 
 | Concern | Choice | Justification |
 |---|---|---|
-| Skill format | SKILL.md (YAML frontmatter + markdown) | Matches all existing wiki skills |
-| CLI | `nlm` (notebooklm-mcp-cli) | Established, already referenced in design |
-| Registry | `wiki/nlm-notebooks.md` (markdown table) | Zero dependencies; readable by both human and Claude |
-| Plugin registration | Symlink in `.claude-plugin/skills/` | Matches existing `wiki-ingest`, `wiki-query`, `wiki-lint` pattern |
+| Gap research | `WebSearch` + `WebFetch` tools | Native to Claude Code; no auth, no CLI install |
+| Raw storage | `raw/<topic>/` (existing pattern) | Consistent with wiki-ingest contract |
+| Skill format | SKILL.md (existing) | No new format needed |
 
 ---
 
@@ -40,75 +37,43 @@ Implement two Claude Code skills (`wiki-nlm-sync` and `wiki-nlm-research`) that 
 
 ```
 skills/
-├── wiki-nlm-sync/
-│   └── SKILL.md          ← NEW
-├── wiki-nlm-research/
-│   └── SKILL.md          ← NEW
 └── wiki-query/
-    └── SKILL.md          ← MODIFIED (additive only — step 5 gap message)
+    └── SKILL.md    ← MODIFIED (step 5 gap section — web search handoff)
 
-.claude-plugin/skills/
-├── wiki-nlm-sync         ← NEW symlink → ../../skills/wiki-nlm-sync
-└── wiki-nlm-research     ← NEW symlink → ../../skills/wiki-nlm-research
-
-wiki/
-└── nlm-notebooks.md      ← NEW (empty registry, created in Phase 1)
+skills/wiki-nlm-sync/       ← DELETED
+skills/wiki-nlm-research/   ← DELETED
+wiki/nlm-notebooks.md       ← EMPTIED (registry table with no rows)
 ```
 
-Files NOT touched: `skills/wiki-ingest/`, `skills/wiki-lint/`, `.claude-plugin/plugin.json`, `wiki/index.md`, `wiki/log.md`.
+Files NOT touched: `skills/wiki-ingest/`, `skills/wiki-lint/`, `wiki/index.md`, `wiki/log.md`, `.claude-plugin/plugin.json`.
 
 ---
 
-## Phases
+## Phase 1 — Update wiki-query step 5
 
-### Phase 1 — Registry + wiki-query gap suggestion
+Single phase. One file to change.
 
-Creates the notebook registry and adds the NotebookLM escalation hint to wiki-query's gap handling.
+**Covers:** FR-1, FR-2, FR-3, FR-4, FR-5, US-1, US-2, US-3
 
-**Covers:** FR-1, FR-5, US-1
+### 1.1 Rewrite step 5 of `skills/wiki-query/SKILL.md`
 
-#### 1.1 Create `wiki/nlm-notebooks.md`
-
-Create the empty registry file:
+Replace the existing step 5 gap handling block with the following content:
 
 ```markdown
-# NotebookLM Notebook Registry
+### 5. Handle low-confidence results
 
-_Maintained by wiki-nlm-sync. Maps local `raw/<topic>/` folders to NotebookLM notebooks._
+If the best qmd score is < 0.3 **and** the index scan also turned up nothing relevant, do not guess or extrapolate. This is valuable signal: it means the question has revealed a hole in the knowledge base. (If the index scan found something the search missed, that's a cross-referencing gap to note — not a content gap.)
 
-| Topic Folder | Notebook Title | Notebook ID (alias) | Last Synced |
-|---|---|---|---|
-```
+**Web search gap handoff (seamless):**
 
-#### 1.2 Update `skills/wiki-query/SKILL.md` — seamless gap handoff
+1. Announce the gap:
+   > "The wiki doesn't have strong coverage of this topic (best match score: 0.XX). This looks like a gap — want me to web-search and ingest a new source, or do you have a document to add to `raw/`?"
 
-In the existing **step 5 (Handle low-confidence results)** section, append the following block immediately after the existing gap message block:
+2. If the user says yes to web search: use the WebSearch tool to find 2–3 relevant sources (papers, blog posts, docs). Present the results with titles and URLs and ask which to ingest.
 
-```markdown
-**NotebookLM gap handoff (seamless):**
+3. If the user provides a local file: proceed directly to `wiki-ingest`.
 
-If all results score below 0.3:
-
-1. Check `wiki/nlm-notebooks.md` for a topic folder matching the question's subject.
-   - If no matching topic is registered: fall back to the existing gap message only. Do not attempt inline execution.
-   - If one topic matches: use it.
-   - If multiple topics could match: ask the user which topic to use before proceeding.
-
-2. Announce the handoff:
-   > "wiki gap detected — proceeding with wiki-nlm-research to find sources for '<question>'."
-
-3. Execute the **full wiki-nlm-research workflow inline** (same conversation, no separate command):
-   - Resolve the topic alias from the registry.
-   - Run `nlm login --check`; halt with auth message if it fails.
-   - Query NotebookLM: `nlm notebook query <alias> "<question>"`
-   - List artifacts: `nlm studio status <alias>`
-   - Offer source descriptions, then ask which artifacts to pull.
-   - Save pulled artifacts to `raw/<topic>/`.
-
-4. After any artifacts are saved, tell the user:
-   > "Pulled to `raw/<topic>/`. Run `wiki-ingest` on `raw/<topic>/<filename>` to integrate into the wiki."
-
-5. After wiki-ingest completes, offer exactly once:
+4. After ingest completes, offer exactly once:
    > "Want me to re-run wiki-query with the original question now that the wiki has been updated? (yes/no)"
    - If yes: re-execute wiki-query with the original question and report results.
    - If no: stop.
@@ -117,403 +82,26 @@ If all results score below 0.3:
 
 ---
 
-### Phase 2 — `wiki-nlm-sync` skill
-
-Creates the bidirectional sync skill covering push, pull, notebook creation, and listing.
-
-**Covers:** FR-1, FR-2, FR-3, FR-4, FR-6, US-5, US-6, US-7, all pull error scenarios.
-
-#### 2.1 Create `skills/wiki-nlm-sync/SKILL.md`
-
-```markdown
----
-name: wiki-nlm-sync
-description: >
-  Manages bidirectional content sync between the local wiki and Google NotebookLM.
-  Use when the user wants to push files from raw/<topic>/ or wiki pages into a
-  NotebookLM notebook, pull generated artifacts (reports, transcripts, mind maps)
-  back into raw/<topic>/, create and register a new topic notebook, or list all
-  registered notebooks. Triggers on: "push to notebooklm", "pull from notebooklm",
-  "sync to notebooklm", "create notebook", "register notebook", "list notebooks",
-  "nlm sync", "nlm push", "nlm pull".
----
-
-# Wiki ↔ NotebookLM Sync
-
-Manages all content movement between the local wiki and Google NotebookLM notebooks.
-Uses the `nlm` CLI for all NotebookLM operations. The registry at `wiki/nlm-notebooks.md`
-is the single source of truth for topic ↔ notebook mapping.
-
-## Prerequisites check
-
-Before any `nlm` operation, verify the CLI is installed:
-
-```bash
-nlm --version
-```
-
-If the command fails, stop and tell the user:
-> "`nlm` CLI not found. Install it with: `uv tool install notebooklm-mcp-cli`"
-
-## Registry: wiki/nlm-notebooks.md
-
-The registry maps `raw/<topic>/` folders to NotebookLM notebooks:
-
-```
-| Topic Folder | Notebook Title | Notebook ID (alias) | Last Synced |
-|---|---|---|---|
-| vlm-research | VLM Research | vlm-research | 2026-05-22 |
-```
-
-If the file does not exist, create it with the header and empty table before proceeding.
-
-## Workflow routing
-
-| User intent | Workflow |
-|---|---|
-| "push", "sync to notebooklm" | Push workflow |
-| "pull", "download artifact" | Pull workflow |
-| "create notebook", "register notebook" | Create notebook |
-| "list notebooks", "show notebooks" | List notebooks |
-
----
-
-## Push workflow
-
-Push local content into a NotebookLM notebook as sources.
-
-### Steps
-
-1. **Resolve topic**: Ask the user for the topic name. Look it up in `wiki/nlm-notebooks.md`
-   (case-insensitive match on Topic Folder column). If not found, list all registered
-   Topic Folder values and stop.
-
-2. **Select content type**: Ask the user what to push:
-   - (a) Files from `raw/<topic>/`
-   - (b) Wiki pages from `wiki/`
-   - (c) Both
-
-3. **List candidates**: Show available files. Skip PDFs with a per-file warning:
-   > "`<filename>.pdf` — skipped (PDFs require manual upload in the NotebookLM UI)"
-
-4. **Confirm selection**: Ask the user to confirm which files to push.
-
-5. **Check for existing sources**:
-   ```bash
-   nlm source list <alias> --json
-   ```
-   For any candidate whose title matches an existing source, warn:
-   > "`<filename>` may already be a source in this notebook. Skip or push anyway?"
-
-6. **Push each confirmed file**:
-   ```bash
-   nlm source add <alias> --text "<file content>" --title "<filename or page title>"
-   ```
-   Report success or failure per file.
-
-7. **Update registry**: Set "Last Synced" to today (YYYY-MM-DD) in `wiki/nlm-notebooks.md`.
-
-8. **Report**: Summarise sources added and files skipped.
-
----
-
-## Pull workflow
-
-Download a generated artifact from NotebookLM into `raw/<topic>/`.
-
-### Steps
-
-1. **Resolve topic**: Look up topic in `wiki/nlm-notebooks.md`. If not found, list valid
-   topics and stop.
-
-2. **List artifacts**:
-   ```bash
-   nlm studio status <alias>
-   ```
-   Display numbered list of available artifacts. If none:
-   > "No generated artifacts available in this notebook yet."
-   Stop.
-
-3. **User selects**: Ask which artifacts to pull (numbers, "all", or "none").
-
-4. **Download each selected artifact**:
-   - Construct filename: `nlm-<artifact-type>-<YYYY-MM-DD>.md`
-   - If that filename already exists in `raw/<topic>/`, append a counter:
-     `nlm-report-2026-05-22-2.md`
-   - Create `raw/<topic>/` if it does not exist
-   - Retrieve and save content as-is:
-     ```bash
-     nlm source content <artifact-id>
-     ```
-     Write output to `raw/<topic>/<filename>`.
-
-5. **Prompt ingest**: After saving:
-   > "Pulled to `raw/<topic>/`. To ingest into the wiki, run `wiki-ingest` and
-   > specify `raw/<topic>/<filename>`."
-
----
-
-## Create notebook
-
-Register a new topic notebook in the local registry.
-
-### Steps
-
-1. **Collect inputs**: Ask for topic folder name (kebab-case) and notebook title.
-
-2. **Create notebook**:
-   ```bash
-   nlm notebook create "<Notebook Title>"
-   ```
-   Capture the returned notebook ID.
-
-3. **Set alias**:
-   ```bash
-   nlm alias set <topic-folder> <notebook-id>
-   ```
-
-4. **Create raw folder if missing**:
-   ```bash
-   mkdir -p raw/<topic-folder>
-   ```
-
-5. **Register in wiki/nlm-notebooks.md**: Append new row:
-   ```
-   | <topic-folder> | <Notebook Title> | <topic-folder> | — |
-   ```
-
-6. **Confirm**: Report the new registration and the `raw/<topic>/` folder path.
-
----
-
-## List notebooks
-
-Display all registered notebooks.
-
-### Steps
-
-1. Read `wiki/nlm-notebooks.md`. If missing, say so and offer to initialise it.
-2. Display the table as formatted markdown.
-3. Note any row where "Last Synced" is "—" as never synced.
-```
-
-#### 2.2 Create `.claude-plugin/skills/wiki-nlm-sync` symlink
-
-```bash
-ln -s ../../skills/wiki-nlm-sync .claude-plugin/skills/wiki-nlm-sync
-```
-
----
-
-### Phase 3 — `wiki-nlm-research` skill
-
-Creates the gap-driven research skill.
-
-**Covers:** FR-2, FR-4, FR-6, US-2, US-3, US-4, all research error scenarios.
-
-#### 3.1 Create `skills/wiki-nlm-research/SKILL.md`
-
-```markdown
----
-name: wiki-nlm-research
-description: >
-  Gap-driven research skill. Query a NotebookLM notebook when wiki-query returns
-  insufficient results (score < 0.3). Use when the user wants to research a
-  knowledge gap against a NotebookLM notebook and optionally pull artifacts into
-  raw/<topic>/. Triggers on: "wiki-nlm-research", "research gap", "ask notebooklm",
-  "query notebooklm", "nlm research", or when wiki-query suggests this skill after
-  detecting a gap.
----
-
-# Wiki ↔ NotebookLM Research
-
-Gap-driven research against a NotebookLM notebook. Use when `wiki-query` signals
-that the local wiki has insufficient coverage (score < 0.3) and you need to look
-further.
-
-## Prerequisites check
-
-Before any operation, verify `nlm` is installed:
-
-```bash
-nlm --version
-```
-
-If not found, stop and tell the user:
-> "`nlm` CLI not found. Install it with: `uv tool install notebooklm-mcp-cli`"
-
-## Inputs
-
-The user provides:
-- **Question**: the gap question (from wiki-query output or a new question)
-- **Topic**: the topic folder name (e.g. `vlm-research`)
-
-If either is missing, ask for it before proceeding.
-
-## Workflow
-
-### 1. Resolve topic
-
-Look up the topic in `wiki/nlm-notebooks.md` (case-insensitive match on Topic Folder).
-
-If the file doesn't exist or the topic isn't registered:
-> "Topic `<topic>` not found in registry. Registered topics: [list]. Use
-> `wiki-nlm-sync` to register a new notebook first."
-
-Stop if topic not found.
-
-### 2. Query NotebookLM
-
-```bash
-nlm notebook query <alias> "<question>"
-```
-
-Display the full cited answer in the conversation.
-
-If `nlm` returns an auth error:
-> "NotebookLM session expired. Run `nlm login` to re-authenticate, then retry."
-
-### 3. List available artifacts
-
-```bash
-nlm studio status <alias>
-```
-
-Display a numbered list of available artifacts (reports, transcripts, mind maps, etc.).
-
-If none available:
-> "No generated artifacts available in this notebook yet."
-Skip to step 5.
-
-### 4. Offer to pull artifacts
-
-> "Which artifacts do you want to pull into `raw/<topic>/`?
-> (Enter numbers, 'all', or 'none')"
-
-For each selected artifact:
-- Construct filename: `nlm-<artifact-type>-<YYYY-MM-DD>.md`
-- If filename already exists in `raw/<topic>/`, append a counter suffix
-- Create `raw/<topic>/` if it does not exist
-- Retrieve and save content as-is:
-  ```bash
-  nlm source content <artifact-id>
-  ```
-  Write to `raw/<topic>/<filename>`.
-
-After saving:
-> "Pulled `<filename>` to `raw/<topic>/`. To integrate into the wiki, run
-> `wiki-ingest` on `raw/<topic>/<filename>`."
-
-### 5. Log the session
-
-Append to `wiki/log.md`:
-
-```
-## [YYYY-MM-DD] nlm-research | <Question>
-Notebook: <topic>, Artifacts pulled: <comma-separated filenames or "none">, Ingest pending: yes/no
-```
-
-Always append this entry — even if no artifacts were pulled.
-
-## What good research looks like
-
-After this skill runs, the user should have:
-1. Seen a cited NotebookLM answer to their question
-2. A clear list of available artifacts
-3. Any selected artifacts saved to `raw/<topic>/`, ready for `wiki-ingest`
-4. A log entry recording what happened
-
-Do not auto-ingest. Do not modify wiki pages directly. Surface results; let the
-user decide what enters the wiki.
-```
-
-#### 3.2 Create `.claude-plugin/skills/wiki-nlm-research` symlink
-
-```bash
-ln -s ../../skills/wiki-nlm-research .claude-plugin/skills/wiki-nlm-research
-```
-
----
-
-### Phase 2b — Rewrite `wiki-nlm-sync` with v1.1.0 additions
-
-Rewrites the existing `skills/wiki-nlm-sync/SKILL.md` to add:
-- Proactive auth check (`nlm login --check`) at the top of every workflow
-- Dedicated **authenticate** sub-workflow (FR-7, FR-8, US-8, US-9)
-- **Discover** sub-workflow — `nlm research` web/drive source discovery (FR-9, US-10)
-- **Drive-sync** sub-workflow — `nlm source stale` / `nlm source sync` (FR-11, US-12)
-- `nlm source describe` offered before artifact selection in pull workflow (FR-10, US-11)
-- Profile support (`--profile`) in all auth steps (FR-8)
-
-Full rewrite of `skills/wiki-nlm-sync/SKILL.md`. Symlink unchanged.
-
----
-
-### Phase 3b — Rewrite `wiki-nlm-research` with v1.1.0 additions
-
-Rewrites the existing `skills/wiki-nlm-research/SKILL.md` to add:
-- Proactive auth check before any `nlm` operation (FR-7, US-8)
-- `nlm source describe` offered before artifact pull (FR-10, US-11)
-- Profile support in auth hint messages (FR-8)
-
-Full rewrite of `skills/wiki-nlm-research/SKILL.md`. Symlink unchanged.
-
----
-
-### Phase 4 — Integration verification
-
-Manual end-to-end walkthrough to confirm the full pipeline works.
-
-#### 4.1 Verify plugin registration
-
-After creating both symlinks, run `/reload-plugins` in Claude Code and confirm both skills appear in `/skills` output.
-
-#### 4.2 Verify registry creation
-
-Trigger `wiki-nlm-sync` → "list notebooks" — confirm it creates `wiki/nlm-notebooks.md` if missing and displays the empty table.
-
-#### 4.3 Verify seamless gap handoff in wiki-query
-
-Ask a question with no wiki coverage (score < 0.3) while a matching topic exists in `wiki/nlm-notebooks.md`. Confirm:
-- wiki-query announces the gap and immediately begins wiki-nlm-research steps (no separate command required).
-- After pull, it states the `wiki-ingest` command.
-- After ingest, it offers to re-run the original query.
-- If no topic is registered, confirm it falls back to the old suggestion-only message.
-
-#### 4.4 Verify full pipeline (requires `nlm` installed)
-
-```
-wiki-query "<unknown topic>"
-  → gap message with wiki-nlm-research suggestion
-wiki-nlm-sync → create notebook → register topic
-wiki-nlm-sync → push → push a raw/ file to the notebook
-wiki-nlm-research "<question>" --topic <topic>
-  → cited answer displayed
-  → artifact list shown
-  → pull one artifact → saved to raw/<topic>/
-  → log entry appended to wiki/log.md
-wiki-ingest raw/<topic>/<artifact>
-  → new wiki page created
-```
-
----
-
 ## Self-Review
 
 **Spec coverage:**
-- FR-1 (registry) → Phase 1.1 ✓
-- FR-2 (topic resolution) → Phase 2 push step 1, Phase 3 step 1 ✓
-- FR-3 (push behavior) → Phase 2 push steps 5–6 ✓
-- FR-4 (pull behavior) → Phase 2 pull step 4, Phase 3 step 4 ✓
-- FR-5 (gap handoff) → Phase 1.2 ✓
-- FR-12 (re-query loop termination) → Phase 1.2 step 5 ✓
-- FR-6 (nlm CLI check) → Phase 2 prerequisites, Phase 3 prerequisites ✓
-- US-1 → Phase 1.2 ✓ | US-2 → Phase 3 steps 1–2 ✓ | US-3 → Phase 3 steps 3–4 ✓
-- US-4 → Phase 3 step 5 ✓ | US-5 → Phase 2 push ✓ | US-6 → Phase 2 create ✓
-- US-7 → Phase 2 list ✓
+- FR-1 (gap threshold) → step 5 condition: score < 0.3 and index scan empty ✓
+- FR-2 (web search) → step 5 web search offer + WebSearch/WebFetch ✓
+- FR-3 (ingest handoff) → step 5 tells user exact wiki-ingest command ✓
+- FR-4 (re-query loop) → step 5 one-shot re-query offer ✓
+- FR-5 (wiki-query step 5) → this is the only file changed ✓
+- US-1 → gap announcement + web search offer ✓
+- US-2 → re-query offer after ingest ✓
+- US-3 → local file path mentioned in gap message ✓
 
-All error scenarios from spec covered: topic not found (Phase 2 step 1, Phase 3 step 1), nlm not installed (prerequisites blocks), auth expired (Phase 3 step 2), no artifacts (Phase 2 pull step 2, Phase 3 step 3), raw/ missing (Phase 2 pull step 4, Phase 3 step 4), PDF in push (Phase 2 push step 3), duplicate filename (Phase 2 pull step 4, Phase 3 step 4).
+**Error scenarios:**
+- No web results → report, suggest local file ✓ (covered by gap message wording)
+- WebFetch failure → offer different result ✓ (implicit in offer step)
+- raw/ missing → wiki-ingest creates it (out of scope for wiki-query) ✓
+- Re-query still < 0.3 → stop, no second loop ✓
 
-**Placeholder scan:** None found.
-
-**Type consistency:** `nlm` CLI commands consistent across Phase 2 and Phase 3.
+**Removed artifacts confirmed:**
+- `skills/wiki-nlm-sync/SKILL.md` — deleted ✓
+- `skills/wiki-nlm-research/SKILL.md` — deleted ✓
+- `.claude-plugin/skills/wiki-nlm-sync` symlink — deleted (if it existed) ✓
+- `.claude-plugin/skills/wiki-nlm-research` symlink — deleted (if it existed) ✓
