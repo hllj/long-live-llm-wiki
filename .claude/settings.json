@@ -1,5 +1,6 @@
 {
   "enabledPlugins": {
-    "llm-wiki@llm-wiki-local": true
+    "llm-wiki@llm-wiki-local": true,
+    "sdd-superpowers@sdd-superpowers-local": true
   }
 }

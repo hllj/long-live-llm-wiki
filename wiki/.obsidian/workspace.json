@@ -1,0 +1,217 @@
+{
+  "main": {
+    "id": "0cbc6264236b8a1a",
+    "type": "split",
+    "children": [
+      {
+        "id": "df24d6c9abd7c45b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9c16ebdf5d6ff7f0",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "analyses/visual-thinking-techniques.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "visual-thinking-techniques"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "0b9177e6350e7889",
+    "type": "split",
+    "children": [
+      {
+        "id": "c95d120ebebcae03",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6202e05efe324df0",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Trình duyệt tệp"
+            }
+          },
+          {
+            "id": "1378dd31f6989006",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Tìm kiếm"
+            }
+          },
+          {
+            "id": "a1fb753377bd3ab6",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Đánh dấu"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "75184103427bb06b",
+    "type": "split",
+    "children": [
+      {
+        "id": "7da45cbd4c54523c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f3f15a4f777b35a7",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "analyses/visual-thinking-techniques.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Liên kết đến của visual-thinking-techniques"
+            }
+          },
+          {
+            "id": "31dcec50e734e658",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "analyses/visual-thinking-techniques.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Liên kết đi ra từ visual-thinking-techniques"
+            }
+          },
+          {
+            "id": "e6a7a6e3fd20402e",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Thẻ"
+            }
+          },
+          {
+            "id": "ba5aacebb8cad144",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Tất cả thuộc tính"
+            }
+          },
+          {
+            "id": "9ebd1ef1dd6616f2",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "analyses/visual-thinking-techniques.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Đề cương của visual-thinking-techniques"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Mở bộ chuyển đổi nhanh": false,
+      "graph:Mở xem biểu đồ": false,
+      "canvas:Tạo bảng mới": false,
+      "daily-notes:Mở ghi chú hôm nay": false,
+      "templates:Chèn mẫu": false,
+      "command-palette:Mở khay lệnh": false,
+      "bases:Tạo cơ sở mới": false
+    }
+  },
+  "active": "9c16ebdf5d6ff7f0",
+  "lastOpenFiles": [
+    "concepts/grpo.md",
+    "entities/v-star-bench.md",
+    "entities/vsi-bench.md",
+    "analyses/covt-limitations-and-research-directions.md",
+    "analyses/vlm-reasoning-training-findings.md",
+    "sources/lmrm-survey.md",
+    "concepts/continuous-visual-tokens.md",
+    "sources/lacot-latent-chain-of-thought.md",
+    "sources/valr-vision-aligned-latent-reasoning.md",
+    "sources/pearl-predictive-embedding-alignment.md",
+    "sources/modal-mixed-cot-latent-embeddings.md",
+    "sources/omnispatial-benchmark.md",
+    "sources/spatialladder.md",
+    "sources/mcot-deep-thinking-survey.md",
+    "concepts/perception-cognition-framework.md",
+    "sources/perception-cognition-survey.md",
+    "concepts/visual-attention-in-vlms.md.tmp.6720.14fcd1766e8f",
+    "concepts/spatial-reasoning-taxonomy.md",
+    "sources/spatial-reasoning-survey.md",
+    "concepts/lmrm-roadmap.md",
+    "sources/icot-interleaved-modal-chain-of-thought.md.tmp.6720.3a380dcd558d",
+    "sources/mirage-machine-mental-imagery.md",
+    "concepts/chain-of-visual-thought.md",
+    "concepts/visual-reasoning-in-vlms.md",
+    "concepts/visual-attention-in-vlms.md",
+    "sources/why-spatial-reasoning-hard-vlms.md",
+    "index.md",
+    "sources/whats-holding-back-latent-visual-reasoning.md"
+  ]
+}

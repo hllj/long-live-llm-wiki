@@ -2,7 +2,10 @@
 
 Compact latent representations that encode rich perceptual cues from vision expert models, designed to be generated autoregressively by a VLM as part of its reasoning chain. First introduced (in this form) by [[concepts/chain-of-visual-thought]].
 
-**Source**: [[sources/covt-chain-of-visual-thought]]
+**Sources**: [[sources/covt-chain-of-visual-thought]], [[sources/whats-holding-back-latent-visual-reasoning]]
+
+> **Note (updated 2026-05-22):** [What's Holding Back Latent Visual Reasoning?](../sources/whats-holding-back-latent-visual-reasoning.md) raises a direct challenge: in 4 tested latent reasoning models, replacing generated latent tokens with uninformative dummy tokens leaves accuracy unchanged — the **latent bypass problem**. Models also exhibit **latent representation collapse** (predicted latents cluster together with 0.8–0.98 mutual similarity while diverging from ground-truth oracles; top-1 retrieval accuracy: 3.3%). The paper attributes this to training datasets that use subregion crops as intermediates (inherently redundant with the input). CoVT's expert-aligned tokens (SAM, DepthAnything, etc.) are a different architecture and were not directly tested, but the bypass concern applies to any latent token approach. The paper shows latents *can* work when training data provides genuinely non-redundant visual intermediates (masked inputs; Tetris synthetic task: oracle 86% vs. dummy 33%).  
+> See [[sources/whats-holding-back-latent-visual-reasoning]] for the full analysis.
 
 ---
 
@@ -67,3 +70,11 @@ Visual tokens are **not decoded** by default — they exist only as latent vecto
 ## Design space notes
 
 CoVT's 4 token types cover the 4 core vision-centric perceptual abilities identified in the literature: (i) instance recognition, (ii) 2D/3D spatial relationships, (iii) structure detection, (iv) deep semantic mining. The design space is not exhaustively explored — alternative or hybrid experts may yield better tokens for specific domains.
+
+## Open question: causal effectiveness at inference
+
+A key unresolved question raised by [[sources/whats-holding-back-latent-visual-reasoning]]: do generated latent tokens actually *causally* influence model predictions at inference, or does the model route around them? The paper showed this bypass occurs in crop-based latent approaches; CoVT's expert-aligned signal may avoid it, but the bypass intervention has not been applied to CoVT directly. Dataset design (ensuring intermediate tokens are genuinely non-redundant with the input image) is the primary lever the field now needs to pull.
+
+**Mirage's answer** ([[sources/mirage-machine-mental-imagery]], CVPR 2026): explicitly ground latent tokens to visual representations in Stage 1 (cosine similarity to helper image embeddings) before removing supervision in Stage 2. t-SNE shows generated latents cluster near the visual manifold even after relaxation — architectural evidence against collapse. This is the first approach to directly engineer around the bypass/collapse failure mode at training time.
+
+**Modal-Mixed CoT's answer** ([[sources/modal-mixed-cot-latent-embeddings]], UC San Diego, 2026): uses a **diffusion-based latent decoder** conditioned on VLM hidden states, with an explicit L2 reconstruction objective on compressed visual embeddings (256 → 32 tokens via average pooling). The diffusion decoder adds richer training signal than cosine similarity; ~2pp improvement over cosine loss variant in ablations. Bypass vulnerability is unverified — the VLM's own encoder is reused (not external expert transformations), so redundancy risk may be higher than CoVT.
