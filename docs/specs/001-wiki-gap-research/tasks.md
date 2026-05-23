@@ -1,7 +1,7 @@
 # Tasks: Wiki Gap Research via Web Search
 
-**Spec:** `docs/specs/001-wiki-notebooklm/spec.md`  
-**Plan:** `docs/specs/001-wiki-notebooklm/plan.md`  
+**Spec:** `docs/specs/001-wiki-gap-research/spec.md`  
+**Plan:** `docs/specs/001-wiki-gap-research/plan.md`  
 **Date:** 2026-05-22  
 **Version:** 2.0.0  
 
@@ -73,9 +73,9 @@ Expected modified/deleted files:
 - `skills/wiki-query/SKILL.md` — modified
 - `skills/wiki-nlm-sync/SKILL.md` — deleted
 - `skills/wiki-nlm-research/SKILL.md` — deleted
-- `docs/specs/001-wiki-notebooklm/spec.md` — modified
-- `docs/specs/001-wiki-notebooklm/plan.md` — modified
-- `docs/specs/001-wiki-notebooklm/tasks.md` — modified
+- `docs/specs/001-wiki-gap-research/spec.md` — modified
+- `docs/specs/001-wiki-gap-research/plan.md` — modified
+- `docs/specs/001-wiki-gap-research/tasks.md` — modified
 
 Pre-existing unrelated changes (`CLAUDE.md`, `.claude/settings.json`) are expected and not part of this feature.
 
@@ -89,9 +89,9 @@ git -C /Users/hllj/Projects/LLM-Wiki-Notebook add \
   skills/wiki-nlm-sync/SKILL.md \
   skills/wiki-nlm-research/SKILL.md \
   wiki/nlm-notebooks.md \
-  docs/specs/001-wiki-notebooklm/spec.md \
-  docs/specs/001-wiki-notebooklm/plan.md \
-  docs/specs/001-wiki-notebooklm/tasks.md
+  docs/specs/001-wiki-gap-research/spec.md \
+  docs/specs/001-wiki-gap-research/plan.md \
+  docs/specs/001-wiki-gap-research/tasks.md
 
 git -C /Users/hllj/Projects/LLM-Wiki-Notebook commit -m "$(cat <<'EOF'
 feat(wiki-query): v2.0.0 — replace NLM integration with web-search gap handoff

@@ -1,6 +1,6 @@
 # Design: Wiki ↔ NotebookLM Integration
 
-**Spec:** 001-wiki-notebooklm  
+**Spec:** 001-wiki-gap-research  
 **Date:** 2026-05-22  
 **Status:** Draft — awaiting spec phase  
 

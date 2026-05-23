@@ -25,7 +25,7 @@ NNN-slug
 - `slug` — kebab-case feature name derived from the spec slug
 
 Examples:
-- `001-wiki-notebooklm`
+- `001-wiki-gap-research`
 - `002-new-feature`
 
 ## Commit format

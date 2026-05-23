@@ -1,6 +1,6 @@
 # Plan: Wiki Gap Research via Web Search
 
-**Spec:** `docs/specs/001-wiki-notebooklm/spec.md`  
+**Spec:** `docs/specs/001-wiki-gap-research/spec.md`  
 **Date:** 2026-05-22  
 **Status:** Approved  
 **Version:** 2.0.0 — replaces NotebookLM integration with web-search gap handoff in wiki-query  

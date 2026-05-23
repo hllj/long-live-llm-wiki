@@ -1,6 +1,6 @@
 # Spec: Wiki Gap Research via Web Search
 
-**ID:** 001-wiki-notebooklm  
+**ID:** 001-wiki-gap-research  
 **Date:** 2026-05-22  
 **Status:** Approved  
 **Version:** 2.0.0  
