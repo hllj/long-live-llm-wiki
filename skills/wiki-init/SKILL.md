@@ -95,145 +95,18 @@ Do **not** touch:
 
 ### 4. Generate CLAUDE.md
 
-Write a complete `CLAUDE.md` to the repo root using the Write tool. This file gives Claude all operational instructions needed to run the wiki for the declared topic. Replace `<COLLECTION_SLUG>`, `<TOPIC_TITLE>`, and `<TOPIC_DESCRIPTION>` with the values derived in Step 1.
+Read the template file at `skills/wiki-init/CLAUDE.md.example` using the Read tool. This file is the reference CLAUDE.md from this project and contains the complete operational schema.
 
-The generated file must follow this exact structure:
+Make the following substitutions throughout the content before writing:
+- Replace every occurrence of `--collection wiki` with `--collection <COLLECTION_SLUG>`
+- Replace the generic topic description in "What this repo is" with the actual TOPIC_TITLE and TOPIC_DESCRIPTION
+- Replace the collection name in the "Search tooling" intro line with `<COLLECTION_SLUG>`
+- Replace the `qmd collection add` command's collection name with `<COLLECTION_SLUG>`
+- Update the "Scope" section at the bottom to name TOPIC_TITLE explicitly
 
-```markdown
-# CLAUDE.md
+Write the result to `CLAUDE.md` at the repo root using the Write tool.
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## What this repo is
-
-An LLM-maintained personal wiki about **<TOPIC_TITLE>**. You (Claude) own the `wiki/` layer entirely — creating, updating, and cross-referencing markdown pages as sources are ingested and questions are asked. The human curates sources and directs analysis; you do all the bookkeeping.
-
-**Topic:** <TOPIC_DESCRIPTION>
-
-Three layers:
-- `raw/` — immutable source documents (articles, papers, images, data). Never modify these.
-- `wiki/` — LLM-generated markdown pages. You own this entirely.
-- `CLAUDE.md` — this file; the operational schema.
-
-Two special files in `wiki/`:
-- `wiki/index.md` — content catalog; one entry per wiki page with a one-line summary. Fallback for queries when qmd is unavailable.
-- `wiki/log.md` — append-only activity log. Every ingest, query, and lint pass gets an entry.
-
-## Search tooling
-
-This wiki uses **qmd** (`npm install -g @tobilu/qmd`) as its local search engine. The `<COLLECTION_SLUG>` collection is pre-configured. Key commands:
-
-> **Project-local index:** Run all qmd commands from the repo root. If a `.qmd/` folder exists there (created by `wiki-init`), qmd automatically uses the project-local index instead of the global one. Check with `ls .qmd/` — if missing, run `qmd init` then `qmd collection add ./wiki --name <COLLECTION_SLUG>` to register the collection.
-
-\`\`\`bash
-qmd query "<question>" --collection <COLLECTION_SLUG> --json --limit 8 2>/dev/null || true   # hybrid search + LLM re-ranking
-qmd search "<term>"   --collection <COLLECTION_SLUG> --json --limit 10 2>/dev/null || true   # fast keyword-only search
-qmd vsearch "<term>"  --collection <COLLECTION_SLUG> --json --limit 8 2>/dev/null || true    # semantic/vector search
-qmd get <file>        --collection <COLLECTION_SLUG> 2>/dev/null || true                     # retrieve a specific page
-qmd status            --collection <COLLECTION_SLUG> 2>/dev/null || true                     # index health
-qmd update            --collection <COLLECTION_SLUG> 2>/dev/null || true                     # re-index after changes
-qmd embed             --collection <COLLECTION_SLUG> 2>/dev/null || true                     # regenerate vectors after bulk changes
-\`\`\`
-
-> **Note:** Always append `2>/dev/null || true` to every qmd command. qmd exits with code 134 (Metal GPU teardown crash in llama.cpp) after producing correct output — suppressing stderr and forcing exit 0 prevents false "Error" banners in Claude Code.
-
-Score thresholds to guide confidence:
-- **≥ 0.6** — high relevance, read full page
-- **0.3–0.59** — moderate, skim snippet first
-- **< 0.3** — wiki likely has a gap; consider ingesting a new source
-
-## Operations
-
-### Ingest
-
-When the human drops a file into `raw/` and asks you to process it:
-
-1. Read the source file.
-2. Run qmd impact scoring to find which existing pages are most affected:
-   \`\`\`bash
-   qmd query "<title or core claim>" --collection <COLLECTION_SLUG> --json --limit 10
-   \`\`\`
-   Pages scoring ≥ 0.5 almost certainly need updating; 0.3–0.49 worth checking.
-3. Discuss key takeaways + flagged pages with the human if they want.
-4. Write a summary page: `wiki/sources/<slug>.md`.
-5. Update or create entity/concept pages — work through qmd's ranked list, highest score first.
-6. Update `wiki/index.md` with any new or changed pages.
-7. Run `qmd update --collection <COLLECTION_SLUG>` to re-index all changes.
-8. Append to `wiki/log.md`:
-   \`\`\`
-   ## [YYYY-MM-DD] ingest | <Source Title>
-   Pages created: ..., Pages updated: ...
-   Key additions: [1–2 sentence summary]
-   \`\`\`
-
-A single source may touch 5–15 wiki pages. That's expected.
-
-### Query
-
-When the human asks a question:
-
-1. Run `qmd query "<question>" --collection <COLLECTION_SLUG> --json --limit 8`.
-   - For complex questions, decompose into 2–3 sub-queries and run each.
-   - Score ≥ 0.6 → read full page. Score 0.3–0.59 → skim snippet first. Score < 0.3 → wiki gap, tell the human.
-2. Synthesize an answer with citations (link to wiki pages, not raw sources directly).
-3. If the answer is valuable and non-trivial, offer to file it as `wiki/analyses/<topic>.md`.
-4. If filed: update `wiki/index.md`, run `qmd update --collection <COLLECTION_SLUG>`, and append to `wiki/log.md`:
-   \`\`\`
-   ## [YYYY-MM-DD] query | <Question or page title>
-   What was answered and whether a new page was created.
-   \`\`\`
-
-### Lint
-
-When asked to health-check the wiki:
-
-1. Run `qmd status --collection <COLLECTION_SLUG>` for index health.
-2. Use targeted qmd searches to find contradictions, orphans, hub pages, and gaps — rather than reading every page.
-3. Report findings as a numbered list with specific pages and suggested fixes.
-4. Fix issues if asked; run `qmd update --collection <COLLECTION_SLUG>` after fixes.
-5. Append to `wiki/log.md`:
-   \`\`\`
-   ## [YYYY-MM-DD] lint
-   Issues found and actions taken.
-   \`\`\`
-
-## Wiki page conventions
-
-- All pages use standard markdown. No special frontmatter required unless you want Dataview queries (add `tags:`, `date:`, `sources:` fields then).
-- Cross-link liberally using `[[Page Name]]` (Obsidian wikilink syntax) or standard `[text](path.md)` links.
-- Source summary pages live in `wiki/sources/`. Entity pages in `wiki/entities/`. Concept pages in `wiki/concepts/`. Analyses and query outputs in `wiki/analyses/`. Top-level overview/synthesis in `wiki/`.
-- When a new source contradicts an existing claim on a page, update that page and note the contradiction inline: `> **Note (updated YYYY-MM-DD):** [new source] contradicts the above — [brief explanation].`
-
-## Index format
-
-`wiki/index.md` sections:
-\`\`\`
-## Sources
-- [Title](sources/slug.md) — one-line summary
-
-## Entities
-- [Name](entities/name.md) — one-line summary
-
-## Concepts
-- [Topic](concepts/topic.md) — one-line summary
-
-## Analyses
-- [Title](analyses/slug.md) — one-line summary
-\`\`\`
-
-## Log format
-
-Each `wiki/log.md` entry starts with `## [YYYY-MM-DD] <type> | <title>` so entries are greppable:
-\`\`\`
-grep "^## \[" wiki/log.md | tail -10
-\`\`\`
-
-## Scope
-
-This wiki covers **<TOPIC_TITLE>**. The human decides which sources to ingest and what questions to ask. At the start of a new sub-topic area, create stub pages for key entities and concepts so future ingests have somewhere to land.
-```
-
-After writing `CLAUDE.md`, verify that qmd commands inside it use the actual collection slug:
+After writing, verify substitution was successful:
 
 ```bash
 grep 'collection wiki' CLAUDE.md && echo "WARNING: literal 'wiki' found — check substitution" || echo "ok"
@@ -332,7 +205,7 @@ After a successful init:
 - `wiki/index.md` opens with `# <TOPIC_TITLE>` and has four empty section headers.
 - `wiki/log.md` contains exactly one entry dated today.
 - `raw/` contains only `raw/.gitkeep`.
-- `CLAUDE.md` is at the repo root, with qmd commands referencing `<COLLECTION_SLUG>`.
+- `CLAUDE.md` is at the repo root, generated from `skills/wiki-init/CLAUDE.md.example` with qmd commands referencing `<COLLECTION_SLUG>` (not the literal string `wiki`).
 - `.gitignore` excludes `raw/*` and `.qmd/`.
 - `.qmd/` exists in the repo root (project-local search index).
 - `<COLLECTION_SLUG>` appears in `qmd collection list` output.
