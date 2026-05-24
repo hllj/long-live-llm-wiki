@@ -5,7 +5,7 @@
       "name": "llm-wiki",
       "source": "./",
       "description": "Skills for operating the LLM-maintained personal wiki: ingest sources, query the wiki, and lint for health issues.",
-      "version": "1.0.0"
+      "version": "0.3.0"
     }
   ],
   "owner": {
