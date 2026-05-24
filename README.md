@@ -11,7 +11,7 @@ See [EXAMPLES.md](./EXAMPLES.md) for real use cases and workflows you can follow
 ## Features
 
 - **Ingest**: Drop any source (PDF, markdown, article) into `raw/` and ask Claude to process it. It writes a summary page, updates all related entity and concept pages, and re-indexes everything.
-- **Query**: Ask questions; Claude searches the wiki with hybrid BM25/vector search, synthesizes an answer with citations, and can file valuable responses as new wiki pages.
+- **Query**: Ask questions; Claude searches the wiki with hybrid BM25/vector search, synthesizes an answer with citations, and can file valuable responses as new wiki pages. When the wiki has a gap (score < 0.3), Claude automatically runs a web search, lets you pick a source, saves it to `raw/`, triggers ingest, and re-queries — no extra commands needed.
 - **Lint**: Periodically health-check the wiki for contradictions, orphan pages, stale claims, and missing cross-references.
 - **Skills**: Three purpose-built Claude Code skills (`wiki-ingest`, `wiki-query`, `wiki-lint`) encode the exact workflows so Claude stays consistent across sessions.
 - **Local search**: Powered by [qmd](https://github.com/tobi/qmd) — hybrid BM25 + vector search with LLM re-ranking, all on-device.
@@ -105,7 +105,7 @@ The three Claude Code skills are in `skills/` and also mirrored in `.claude-plug
 | Skill | Trigger | What it does |
 |---|---|---|
 | `wiki-ingest` | "ingest this", "process raw/…" | Full ingest: read → impact score → summarize → update pages → re-index → log |
-| `wiki-query` | Any question about wiki content | Search → synthesize → cite → optionally file as new page |
+| `wiki-query` | Any question about wiki content | Search → synthesize → cite → gap detected? → web-search → ingest → re-query |
 | `wiki-lint` | "lint the wiki", "health-check" | Index health → find contradictions/orphans/gaps → report → fix if asked |
 
 ## Customizing for your domain
