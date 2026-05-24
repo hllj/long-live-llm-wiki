@@ -97,8 +97,21 @@ grep -qF '.backup/' .gitignore 2>/dev/null && echo "present" || echo "absent"
   .backup/
   ```
 
+Check for `.qmd/` in `.gitignore`:
+
+```bash
+grep -qF '.qmd/' .gitignore 2>/dev/null && echo "present" || echo "absent"
+```
+
+- If **absent**: append to `.gitignore`:
+  ```
+  
+  # qmd local index
+  .qmd/
+  ```
+
 - If all lines were already present: report "`.gitignore` already up to date."
-- If `.gitignore` does not exist: create it containing only the two sections above.
+- If `.gitignore` does not exist: create it containing only the three sections above.
 
 ### 4. Clean wiki subdirectories and raw/
 
@@ -188,15 +201,59 @@ Stubs created: <comma-separated list of stub page filenames, or "none">
 .gitignore: <"updated" or "already up to date">
 ```
 
-### 8. Rebuild qmd index
+### 8. Set up qmd project-local index and collection
+
+`<collection-slug>` is the kebab-case slug of the topic title derived in Step 1
+(e.g. topic title "Large Language Models" → slug `large-language-models`).
+
+#### 8a. Initialize project-local index
+
+Run from the repo root:
 
 ```bash
-qmd update --collection wiki 2>/dev/null || true
+qmd init 2>/dev/null || true
+```
+
+Verify `.qmd/` was created:
+
+```bash
+ls .qmd/ 2>/dev/null && echo "ok" || echo "missing"
+```
+
+If missing, warn: "`.qmd/` folder was not created — run `qmd init` manually before
+using search commands."
+
+#### 8b. Register the wiki collection
+
+Check whether the collection is already registered:
+
+```bash
+qmd collection list 2>/dev/null || true
+```
+
+If `<collection-slug>` does not appear in the output, add it:
+
+```bash
+qmd collection add ./wiki --name <collection-slug> 2>/dev/null || true
+```
+
+#### 8c. Confirm setup
+
+```bash
+qmd collection list 2>/dev/null || true
+```
+
+Report the output so the user can confirm `<collection-slug>` is listed.
+
+#### 8d. Build the index
+
+```bash
+qmd update --collection <collection-slug> 2>/dev/null || true
 ```
 
 If output before the forced exit-0 suggests failure, warn: "qmd index update may
-have failed — run `qmd update --collection wiki` manually if searches return
-stale results."
+have failed — run `qmd update --collection <collection-slug>` manually if searches
+return stale results."
 
 Report: "Wiki initialized. Drop sources into `raw/` and run `wiki-ingest` to begin."
 
@@ -212,8 +269,10 @@ After a successful init:
   created stubs.
 - `wiki/log.md` contains exactly one entry dated today.
 - `raw/` contains only `raw/.gitkeep`.
-- `.gitignore` excludes `raw/*` and `.backup/`.
-- `qmd status --collection wiki` shows a freshly updated index.
+- `.gitignore` excludes `raw/*`, `.backup/`, and `.qmd/`.
+- `.qmd/` exists in the repo root (project-local search index).
+- `<collection-slug>` appears in `qmd collection list` output.
+- `qmd status --collection <collection-slug>` shows a freshly updated index.
 
 The human can now run `wiki-ingest` on any source to begin building real content
 into the scaffold.

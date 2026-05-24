@@ -252,15 +252,51 @@ Stubs created: <comma-separated list of stub page filenames, or "none">
 .gitignore: <"updated" or "already up to date">
 \`\`\`
 
-### 8. Rebuild qmd index
+### 8. Set up qmd project-local index and collection
+
+`<collection-slug>` is the kebab-case slug of the topic title derived in Step 1.
+
+#### 8a. Initialize project-local index
 
 \`\`\`bash
-qmd update --collection wiki 2>/dev/null || true
+qmd init 2>/dev/null || true
+\`\`\`
+
+Verify `.qmd/` was created:
+
+\`\`\`bash
+ls .qmd/ 2>/dev/null && echo "ok" || echo "missing"
+\`\`\`
+
+#### 8b. Register the wiki collection
+
+\`\`\`bash
+qmd collection list 2>/dev/null || true
+\`\`\`
+
+If `<collection-slug>` does not appear, add it:
+
+\`\`\`bash
+qmd collection add ./wiki --name <collection-slug> 2>/dev/null || true
+\`\`\`
+
+#### 8c. Confirm setup
+
+\`\`\`bash
+qmd collection list 2>/dev/null || true
+\`\`\`
+
+Report the output so the user can confirm `<collection-slug>` is listed.
+
+#### 8d. Build the index
+
+\`\`\`bash
+qmd update --collection <collection-slug> 2>/dev/null || true
 \`\`\`
 
 If output before the forced exit-0 suggests failure, warn: "qmd index update may
-have failed — run `qmd update --collection wiki` manually if searches return
-stale results."
+have failed — run `qmd update --collection <collection-slug>` manually if searches
+return stale results."
 
 Report: "Wiki initialized. Drop sources into `raw/` and run `wiki-ingest` to begin."
 
@@ -276,8 +312,10 @@ After a successful init:
   created stubs.
 - `wiki/log.md` contains exactly one entry dated today.
 - `raw/` contains only `raw/.gitkeep`.
-- `.gitignore` excludes `raw/*` and `.backup/`.
-- `qmd status --collection wiki` shows a freshly updated index.
+- `.gitignore` excludes `raw/*`, `.backup/`, and `.qmd/`.
+- `.qmd/` exists in the repo root (project-local search index).
+- `<collection-slug>` appears in `qmd collection list` output.
+- `qmd status --collection <collection-slug>` shows a freshly updated index.
 
 The human can now run `wiki-ingest` on any source to begin building real content
 into the scaffold.
@@ -318,6 +356,7 @@ This phase applies the init workflow to the current repo — both producing the 
   ```bash
   grep -F 'raw/*' .gitignore && echo "raw/* present" || echo "raw/* absent"
   grep -F '.backup/' .gitignore && echo ".backup/ present" || echo ".backup/ absent"
+  grep -F '.qmd/' .gitignore && echo ".qmd/ present" || echo ".qmd/ absent"
   ```
 - [ ] Append missing lines to `.gitignore` (use the Edit tool, not `>>`):
   ```
@@ -328,11 +367,15 @@ This phase applies the init workflow to the current repo — both producing the 
   
   # Wiki backup
   .backup/
+  
+  # qmd local index
+  .qmd/
   ```
 - [ ] Verify no duplicate lines:
   ```bash
   grep -c 'raw/\*' .gitignore
   grep -c '\.backup/' .gitignore
+  grep -c '\.qmd/' .gitignore
   ```
   - Expected: each count is exactly 1
 
@@ -423,15 +466,31 @@ This phase applies the init workflow to the current repo — both producing the 
   ```
   - Expected: `clean`
 
-### 2.6 Rebuild qmd index
+### 2.6 Set up qmd project-local index and collection
 
-- [ ] Run:
+- [ ] Initialize project-local index:
   ```bash
-  qmd update --collection wiki 2>/dev/null || true
+  qmd init 2>/dev/null || true
+  ls .qmd/ 2>/dev/null && echo "ok" || echo "missing"
   ```
-- [ ] Verify index reflects new state:
+  - Expected: `.qmd/` folder exists
+- [ ] Check and register collection (use `<collection-slug>` = kebab-case topic title slug):
   ```bash
-  qmd status --collection wiki 2>/dev/null || true
+  qmd collection list 2>/dev/null || true
+  ```
+  If `<collection-slug>` absent:
+  ```bash
+  qmd collection add ./wiki --name <collection-slug> 2>/dev/null || true
+  ```
+- [ ] Confirm collection is listed:
+  ```bash
+  qmd collection list 2>/dev/null || true
+  ```
+  - Expected: `<collection-slug>` appears in output
+- [ ] Build index:
+  ```bash
+  qmd update --collection <collection-slug> 2>/dev/null || true
+  qmd status --collection <collection-slug> 2>/dev/null || true
   ```
   - Expected: reports updated collection with page count matching stubs + index
 - [ ] Commit all production changes:
