@@ -141,7 +141,49 @@ Tell Claude to fix them and it applies all changes, then re-indexes.
 
 ---
 
-## 9. Spot contradictions across papers
+## 9. Use wiki-lint to find missed entities
+
+After several ingests you may have sources that mention named models, benchmarks, or authors that were never given their own `wiki/entities/` page — they exist only as inline mentions scattered across other pages.
+
+```
+/wiki-lint
+```
+
+Claude scans for entity mentions that appear frequently in page snippets but have no corresponding entry in `wiki/index.md` under `## Entities`. It surfaces these as missing entity pages:
+
+```
+## Missing entity pages
+1. "AdaptVis" appears in 5 page snippets (visual-reasoning-in-vlms.md,
+   why-spatial-reasoning-hard-vlms.md, visual-thinking-techniques.md, …)
+   but has no entity page.
+   Fix: create wiki/entities/adaptvis.md.
+
+2. "V*Bench" appears in 3 page snippets but has no entity page.
+   Fix: create wiki/entities/v-star-bench.md.
+
+3. "Chameleon-7B" is referenced as a base model in 4 sources
+   but has no entity page.
+   Fix: create wiki/entities/chameleon-7b.md.
+```
+
+Tell Claude to fix them:
+
+```
+Fix all missing entity pages.
+```
+
+Claude creates each stub with a `## Overview` section pre-populated from the snippets it already found, cross-links them into the pages that mention them, adds entries to `wiki/index.md`, re-indexes, and logs the pass.
+
+You can also target this check explicitly if you suspect a specific entity is undercovered:
+
+```
+Does the wiki have a proper entity page for AdaptVis,
+or is it only mentioned in passing on other pages?
+```
+
+---
+
+## 10. Spot contradictions across papers
 
 ```
 Do any papers in the wiki disagree about whether latent visual tokens are actually used at inference?
@@ -151,7 +193,7 @@ Claude searches for contradiction markers, cross-references log timestamps to de
 
 ---
 
-## 10. Adapt the wiki for a new domain
+## 11. Adapt the wiki for a new domain
 
 This repo ships focused on LLM/VLM research, but the pattern works for any domain — medical literature, legal documents, competitive intelligence, engineering specs.
 
@@ -171,6 +213,7 @@ The skills (`wiki-ingest`, `wiki-query`, `wiki-lint`) and `qmd` are domain-agnos
 | Ingest a file | `process raw/<filename>` |
 | Ask a question | Any question — Claude routes it through `wiki-query` |
 | Health-check | `/wiki-lint` |
+| Find missed entity pages | `/wiki-lint` — look for "Missing entity pages" section |
 | Find a gap | Just ask — Claude tells you if coverage is low and offers to search |
 | Save a query result | Say "yes" when Claude offers to file the analysis |
 | Re-index after manual edits | `qmd update --collection wiki` |
