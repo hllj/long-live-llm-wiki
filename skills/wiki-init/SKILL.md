@@ -2,81 +2,58 @@
 name: wiki-init
 description: >
   Initializes the LLM Wiki Notebook for a new topic. Use this skill when the
-  user wants to start fresh, set up the wiki for a new topic, scaffold
-  placeholder pages, back up existing content, or prepare the repo for
-  production use. Trigger when the user says "init the wiki", "start a new
-  wiki", "set up the wiki for X", "initialize", "prepare for production",
-  "reset the wiki", or drops a request to configure the notebook from scratch.
+  user wants to start fresh, set up the wiki for a new topic, clean out
+  previous content, or prepare the repo for production use. Trigger when the
+  user says "init the wiki", "start a new wiki", "set up the wiki for X",
+  "initialize", "prepare for production", "reset the wiki", or drops a request
+  to configure the notebook from scratch.
 ---
 
 # Wiki Init
 
 You are initializing the LLM Wiki Notebook for a new topic. Your job is to
-guide the user through declaring their wiki's scope, safely back up all existing
-content, clean out example/previous content, scaffold placeholder pages for the
-new domain, update `.gitignore`, and rebuild the search index — all before any
-real sources are ingested.
+collect the topic from the user via a UI dialog, clean out previous content,
+generate a `CLAUDE.md` tailored to the new domain, scaffold the index and log,
+update `.gitignore`, and rebuild the search index — all before any real sources
+are ingested.
 
 ## Workflow
 
-### 1. Collect topic information (before touching any files)
+### 1. Collect topic information via AskUserQuestion
 
-Ask three questions **sequentially** — wait for each answer before asking the next.
+Use the `AskUserQuestion` tool to show a single dialog to the user:
 
-**Q1 (required):** "What is this wiki about? Describe the topic or project in 1–3 sentences."
-
-- Do not proceed if the user provides an empty response. Re-ask: "Topic description
-  is required. Please describe what this wiki is about."
-- Derive a topic title from the first 4–5 significant words of the description,
-  title-cased (e.g. "Reinforcement Learning from Human Feedback").
-
-**Q2 (optional, skip on empty):** "Name up to 5 key **entities** (people, models,
-systems, papers, tools) this wiki should track. Separate with commas, or press
-Enter to skip."
-
-**Q3 (optional, skip on empty):** "Name up to 5 key **concepts** (ideas, techniques,
-frameworks, phenomena) this wiki should track. Separate with commas, or press
-Enter to skip."
-
-For each name in Q2 and Q3:
-- Trim whitespace.
-- Convert to kebab-case slug: lowercase, spaces → hyphens, strip all
-  non-alphanumeric characters except hyphens.
-- If the resulting slug is empty after stripping, skip that entry and inform the
-  user: "Skipping '<name>' — could not produce a valid filename."
-
-Do not proceed to Step 2 until all three questions have been answered (or skipped).
-
-### 2. Backup existing content
-
-Before modifying or deleting any file:
-
-```bash
-mkdir -p .backup/raw .backup/wiki
-cp -r raw/. .backup/raw/ 2>&1
-cp -r wiki/. .backup/wiki/ 2>&1
+```
+question: "What is this wiki about? Describe the topic or project in 1–3 sentences."
+header: "Wiki Topic"
+options: [
+  { label: "Describe your topic", description: "Enter a 1–3 sentence description of the subject this wiki will cover." }
+]
 ```
 
-Count backed-up files:
+If the user selects "Other" and provides a custom text response, use that.
 
-```bash
-find .backup/raw .backup/wiki -type f | wc -l
-```
+**Validation:** If the returned answer is empty or only whitespace, call `AskUserQuestion` again with an added note: "Topic description is required. Please describe what this wiki is about."
 
-Report: "Backed up N files to `.backup/` (raw/ and wiki/)."
+**Derived values (compute before touching any files):**
+- `TOPIC_DESCRIPTION` — the user's answer verbatim
+- `TOPIC_TITLE` — first 4–5 significant words of the description, title-cased
+  (e.g. "My wiki is about reinforcement learning from human feedback" → "Reinforcement Learning from Human Feedback")
+- `COLLECTION_SLUG` — kebab-case of TOPIC_TITLE
+  (e.g. "Reinforcement Learning from Human Feedback" → `reinforcement-learning-from-human-feedback`)
 
-**If either `cp` command fails:** Stop immediately. Do not delete or overwrite any
-file. Report: "Backup failed: <error>. Aborting init — no files have been modified."
+Do not proceed to Step 2 until TOPIC_DESCRIPTION is non-empty.
 
-### 3. Update .gitignore
+### 2. Update .gitignore
 
-Check if `.gitignore` already contains `raw/*`:
+Check each required line. Append only missing sections — never remove or reorder existing lines.
 
 ```bash
 grep -qF 'raw/*' .gitignore 2>/dev/null && echo "present" || echo "absent"
+grep -qF '.qmd/' .gitignore 2>/dev/null && echo "present" || echo "absent"
 ```
 
-- If **absent**: append to `.gitignore`:
+- If `raw/*` is **absent**: append to `.gitignore`:
   ```
   
   # Wiki raw sources
@@ -84,26 +61,7 @@ grep -qF 'raw/*' .gitignore 2>/dev/null && echo "present" || echo "absent"
   !raw/.gitkeep
   ```
 
-Check for `.backup/` in `.gitignore`:
-
-```bash
-grep -qF '.backup/' .gitignore 2>/dev/null && echo "present" || echo "absent"
-```
-
-- If **absent**: append to `.gitignore`:
-  ```
-  
-  # Wiki backup
-  .backup/
-  ```
-
-Check for `.qmd/` in `.gitignore`:
-
-```bash
-grep -qF '.qmd/' .gitignore 2>/dev/null && echo "present" || echo "absent"
-```
-
-- If **absent**: append to `.gitignore`:
+- If `.qmd/` is **absent**: append to `.gitignore`:
   ```
   
   # qmd local index
@@ -111,9 +69,9 @@ grep -qF '.qmd/' .gitignore 2>/dev/null && echo "present" || echo "absent"
   ```
 
 - If all lines were already present: report "`.gitignore` already up to date."
-- If `.gitignore` does not exist: create it containing only the three sections above.
+- If `.gitignore` does not exist: create it containing only the two sections above.
 
-### 4. Clean wiki subdirectories and raw/
+### 3. Clean wiki subdirectories and raw/
 
 Remove all content-bearing files, then place `.gitkeep` in each directory:
 
@@ -132,83 +90,63 @@ find raw -type f -not -name '.gitkeep' -delete
 
 Do **not** touch:
 - `wiki/.obsidian/` (Obsidian config — leave as-is)
-- `wiki/index.md` and `wiki/log.md` — overwritten in Steps 6 and 7, not deleted here
-- `CLAUDE.md`, `README.md`, `llm-wiki.md`, `skills/`, `docs/`
+- `wiki/index.md` and `wiki/log.md` — overwritten in Steps 5 and 6, not deleted here
+- `skills/`, `docs/`, `README.md`, `llm-wiki.md`
 
-### 5. Create stub pages
+### 4. Generate CLAUDE.md
 
-For each entity name provided in Q2:
+Read the template file at `skills/wiki-init/CLAUDE.md.example` using the Read tool. This file is the reference CLAUDE.md from this project and contains the complete operational schema.
 
-Write `wiki/entities/<slug>.md`:
-```markdown
-# <Entity Name>
+Make the following substitutions throughout the content before writing:
+- Replace every occurrence of `--collection wiki` with `--collection <COLLECTION_SLUG>`
+- Replace the generic topic description in "What this repo is" with the actual TOPIC_TITLE and TOPIC_DESCRIPTION
+- Replace the collection name in the "Search tooling" intro line with `<COLLECTION_SLUG>`
+- Replace the `qmd collection add` command's collection name with `<COLLECTION_SLUG>`
+- Update the "Scope" section at the bottom to name TOPIC_TITLE explicitly
 
-_Stub — to be filled by wiki-ingest._
+Write the result to `CLAUDE.md` at the repo root using the Write tool.
 
-## Notes
+After writing, verify substitution was successful:
 
+```bash
+grep 'collection wiki' CLAUDE.md && echo "WARNING: literal 'wiki' found — check substitution" || echo "ok"
 ```
 
-For each concept name provided in Q3:
-
-Write `wiki/concepts/<slug>.md`:
-```markdown
-# <Concept Name>
-
-_Stub — to be filled by wiki-ingest._
-
-## Notes
-
-```
-
-If the user provided no entities or no concepts, skip that category silently.
-
-### 6. Write wiki/index.md
+### 5. Write wiki/index.md
 
 Write the complete file (overwrites the old index):
 
 ```markdown
-# <Topic Title>
+# <TOPIC_TITLE>
 
-<User's topic description verbatim from Q1>
+<TOPIC_DESCRIPTION>
 
 ## Sources
 
 ## Entities
 
-- [<Entity Name>](entities/<slug>.md) — (stub)
-
 ## Concepts
-
-- [<Concept Name>](concepts/<slug>.md) — (stub)
 
 ## Analyses
 
 ```
 
-If no stubs were created for Entities or Concepts, leave that section's body empty
-(keep the `##` header).
-
-### 7. Write wiki/log.md
+### 6. Write wiki/log.md
 
 Write the complete file (this is a reset — do not append to the old log):
 
 ```markdown
-## [YYYY-MM-DD] init | <Topic Title>
-Backed up: raw/ and wiki/ (N files total) → .backup/
+## [YYYY-MM-DD] init | <TOPIC_TITLE>
 Cleaned: wiki/concepts/, wiki/entities/, wiki/sources/, wiki/analyses/, raw/
-Stubs created: <comma-separated list of stub page filenames, or "none">
 .gitignore: <"updated" or "already up to date">
+CLAUDE.md: generated (collection: <COLLECTION_SLUG>)
 ```
 
-### 8. Set up qmd project-local index and collection
+### 7. Set up qmd project-local index and collection
 
-`<collection-slug>` is the kebab-case slug of the topic title derived in Step 1
-(e.g. topic title "Large Language Models" → slug `large-language-models`).
+`<COLLECTION_SLUG>` is the kebab-case slug derived in Step 1.
 
-#### 8a. Initialize project-local index
-
-Run from the repo root:
+#### 7a. Initialize project-local index
 
 ```bash
 qmd init 2>/dev/null || true
@@ -223,7 +161,7 @@ ls .qmd/ 2>/dev/null && echo "ok" || echo "missing"
 If missing, warn: "`.qmd/` folder was not created — run `qmd init` manually before
 using search commands."
 
-#### 8b. Register the wiki collection
+#### 7b. Register the wiki collection
 
 Check whether the collection is already registered:
 
@@ -231,28 +169,28 @@ Check whether the collection is already registered:
 qmd collection list 2>/dev/null || true
 ```
 
-If `<collection-slug>` does not appear in the output, add it:
+If `<COLLECTION_SLUG>` does not appear in the output, add it:
 
 ```bash
-qmd collection add ./wiki --name <collection-slug> 2>/dev/null || true
+qmd collection add ./wiki --name <COLLECTION_SLUG> 2>/dev/null || true
 ```
 
-#### 8c. Confirm setup
+#### 7c. Confirm setup
 
 ```bash
 qmd collection list 2>/dev/null || true
 ```
 
-Report the output so the user can confirm `<collection-slug>` is listed.
+Report the output so the user can confirm `<COLLECTION_SLUG>` is listed.
 
-#### 8d. Build the index
+#### 7d. Build the index
 
 ```bash
-qmd update --collection <collection-slug> 2>/dev/null || true
+qmd update --collection <COLLECTION_SLUG> 2>/dev/null || true
 ```
 
 If output before the forced exit-0 suggests failure, warn: "qmd index update may
-have failed — run `qmd update --collection <collection-slug>` manually if searches
+have failed — run `qmd update --collection <COLLECTION_SLUG>` manually if searches
 return stale results."
 
 Report: "Wiki initialized. Drop sources into `raw/` and run `wiki-ingest` to begin."
@@ -262,17 +200,16 @@ Report: "Wiki initialized. Drop sources into `raw/` and run `wiki-ingest` to beg
 ## What good initialization looks like
 
 After a successful init:
-- `.backup/` holds the full previous state of `raw/` and `wiki/`.
 - `wiki/concepts/`, `wiki/entities/`, `wiki/sources/`, `wiki/analyses/` each
   contain only `.gitkeep`.
-- `wiki/index.md` opens with the new topic heading and lists only the newly
-  created stubs.
+- `wiki/index.md` opens with `# <TOPIC_TITLE>` and has four empty section headers.
 - `wiki/log.md` contains exactly one entry dated today.
 - `raw/` contains only `raw/.gitkeep`.
-- `.gitignore` excludes `raw/*`, `.backup/`, and `.qmd/`.
+- `CLAUDE.md` is at the repo root, generated from `skills/wiki-init/CLAUDE.md.example` with qmd commands referencing `<COLLECTION_SLUG>` (not the literal string `wiki`).
+- `.gitignore` excludes `raw/*` and `.qmd/`.
 - `.qmd/` exists in the repo root (project-local search index).
-- `<collection-slug>` appears in `qmd collection list` output.
-- `qmd status --collection <collection-slug>` shows a freshly updated index.
+- `<COLLECTION_SLUG>` appears in `qmd collection list` output.
+- `qmd status --collection <COLLECTION_SLUG>` shows a freshly updated index.
 
 The human can now run `wiki-ingest` on any source to begin building real content
 into the scaffold.

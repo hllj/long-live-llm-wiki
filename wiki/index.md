@@ -1,6 +1,6 @@
-# LLM / AI Systems Research
+# Large Language Models
 
-Papers, models, and techniques in large language models and AI systems.
+Research, architectures, training techniques, and applications of LLMs.
 
 ## Sources
 

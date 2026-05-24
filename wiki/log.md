@@ -1,5 +1,4 @@
-## [2026-05-24] init | LLM / AI Systems Research
-Backed up: raw/ and wiki/ (43 files total) → .backup/
+## [2026-05-25] init | Large Language Models
 Cleaned: wiki/concepts/, wiki/entities/, wiki/sources/, wiki/analyses/, raw/
-Stubs created: none
-.gitignore: updated
+.gitignore: already up to date
+CLAUDE.md: generated (collection: large-language-models)
