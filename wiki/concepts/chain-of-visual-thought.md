@@ -2,7 +2,9 @@
 
 A framework that extends Chain-of-Thought reasoning from discrete text space into continuous visual latent space. Rather than forcing VLMs to verbalize visual observations as text, CoVT lets the model "think" by generating compact continuous visual tokens that encode perceptual cues directly in its reasoning chain.
 
-**Source**: [[sources/covt-chain-of-visual-thought]]
+**Sources**: [[sources/covt-chain-of-visual-thought]], [[sources/whats-holding-back-latent-visual-reasoning]]
+
+> **Note (updated 2026-05-22):** [What's Holding Back Latent Visual Reasoning?](../sources/whats-holding-back-latent-visual-reasoning.md) finds that in several latent visual reasoning models, generated latent tokens are bypassed — replacing them with dummy tokens leaves accuracy unchanged. CoVT was not among the 4 models tested (which all use image-crop-based intermediates), and CoVT's expert-aligned tokens may be more informative. However, whether CoVT's tokens are *causally* active at inference is an open question. The paper's key insight: benchmark gains from latent-token training may reflect better supervision rather than causal token use at inference.
 
 ---
 
@@ -70,3 +72,11 @@ Four progressive stages prevent catastrophic forgetting of text capability:
 - 8 segmentation tokens is the sweet spot; 32 degrades performance
 - Decoder-level alignment (for task-oriented experts) outperforms feature-level MSE alignment
 - All 4 training stages are necessary; skipping stages 1–2 notably hurts BLINK
+
+---
+
+## See Also
+
+- [[concepts/visual-attention-in-vlms]] — mechanistic root cause: image tokens get ~10% of attention despite being ~90% of input; CoVT's expert tokens address this by injecting signals the model was underweighting
+- [[concepts/continuous-visual-tokens]] — the token types (seg, depth, edge, DINO) and alignment strategies
+- [[concepts/visual-reasoning-in-vlms]] — paradigm taxonomy: CoVT is Paradigm 6

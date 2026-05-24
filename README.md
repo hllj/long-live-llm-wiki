@@ -6,6 +6,8 @@ An LLM-maintained personal knowledge base. Claude Code owns the `wiki/` layer en
 
 Inspired by [LLM Wiki](./llm-wiki.md), the pattern document behind this repo.
 
+See [EXAMPLES.md](./EXAMPLES.md) for real use cases and workflows you can follow from day one.
+
 ## Features
 
 - **Ingest**: Drop any source (PDF, markdown, article) into `raw/` and ask Claude to process it. It writes a summary page, updates all related entity and concept pages, and re-indexes everything.

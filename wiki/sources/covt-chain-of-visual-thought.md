@@ -115,3 +115,4 @@ LoRA finetuning (rank=16, alpha=32, lr=5e-5; projection layer lr=1e-5). Batch si
 - [[concepts/chain-of-visual-thought]] — the CoVT framework concept
 - [[concepts/visual-reasoning-in-vlms]] — broader context of VLM visual reasoning
 - [[concepts/continuous-visual-tokens]] — the key technical mechanism
+- [[concepts/visual-attention-in-vlms]] — mechanistic root cause that motivates CoVT: image tokens receive only ~10% of attention; CoVT's expert tokens directly address this

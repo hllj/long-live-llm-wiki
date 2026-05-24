@@ -20,14 +20,16 @@ Two special files in `wiki/`:
 This wiki uses **qmd** (`npm install -g @tobilu/qmd`) as its local search engine. The `wiki` collection is pre-configured. Key commands:
 
 ```bash
-qmd query "<question>" --collection wiki --json --limit 8   # hybrid search + LLM re-ranking
-qmd search "<term>"   --collection wiki --json --limit 10   # fast keyword-only search
-qmd vsearch "<term>"  --collection wiki --json --limit 8    # semantic/vector search
-qmd get <file>        --collection wiki                     # retrieve a specific page
-qmd status            --collection wiki                     # index health
-qmd update            --collection wiki                     # re-index after changes
-qmd embed             --collection wiki                     # regenerate vectors after bulk changes
+qmd query "<question>" --collection wiki --json --limit 8 2>/dev/null || true   # hybrid search + LLM re-ranking
+qmd search "<term>"   --collection wiki --json --limit 10 2>/dev/null || true   # fast keyword-only search
+qmd vsearch "<term>"  --collection wiki --json --limit 8 2>/dev/null || true    # semantic/vector search
+qmd get <file>        --collection wiki 2>/dev/null || true                     # retrieve a specific page
+qmd status            --collection wiki 2>/dev/null || true                     # index health
+qmd update            --collection wiki 2>/dev/null || true                     # re-index after changes
+qmd embed             --collection wiki 2>/dev/null || true                     # regenerate vectors after bulk changes
 ```
+
+> **Note:** Always append `2>/dev/null || true` to every qmd command. qmd exits with code 134 (Metal GPU teardown crash in llama.cpp) after producing correct output — suppressing stderr and forcing exit 0 prevents false "Error" banners in Claude Code.
 
 Score thresholds to guide confidence:
 - **≥ 0.6** — high relevance, read full page
