@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.0] — 2026-05-24
+
+### Added
+
+- `wiki-init` skill — guided one-command wiki setup: collects topic, backs up existing content to `.backup/`, cleans example pages, scaffolds entity/concept stubs, resets `index.md` and `log.md`, updates `.gitignore`, and rebuilds the qmd index.
+- `.gitignore` now excludes `raw/*` (keeping `raw/.gitkeep`) and `.backup/` — raw PDFs and backups stay out of git automatically.
+- Production init applied: repo reset for **LLM / AI Systems Research** topic; all previous VLM example content preserved in `.backup/`.
+
+### Changed
+
+- README updated with `wiki-init` usage, updated Skills table, and simplified "Customizing for your domain" section.
+
+---
+
 ## [0.2.0] — 2026-05-24
 
 ### Added
