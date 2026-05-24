@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.0] — 2026-05-24
+
+### Added
+
+- `wiki-query` v2.0: native web-search gap-handoff flow — when a query scores < 0.3, Claude runs `WebSearch`, lets the user pick a source, saves it to `raw/`, triggers `wiki-ingest`, and offers a re-query. No external CLI or auth required.
+- `EXAMPLES.md` — end-to-end usage examples for ingest, query, and lint workflows.
+- Docs examples for lint and query use cases.
+
+### Changed
+
+- `wiki-query` gap escalation now uses web search instead of NotebookLM, removing the need for Google Drive auth or any external integration.
+
+### Removed
+
+- `wiki-nlm-sync` and `wiki-nlm-research` skills — NotebookLM integration replaced by the simpler web-search gap-handoff in `wiki-query`.
+
+---
+
 ## [0.1.0] — 2026-05-22
 
 ### Added
