@@ -57,20 +57,21 @@ npm install -g @tobilu/qmd
    cd long-live-llm-wiki
    ```
 
-2. **Initialize the qmd index**
-
-   ```bash
-   qmd update --collection wiki
-   qmd embed --collection wiki
-   ```
-
-3. **Open Claude Code in this directory**
+2. **Open Claude Code in this directory**
 
    ```bash
    claude
    ```
 
    Claude will load `CLAUDE.md` automatically and be ready to operate the wiki.
+
+3. **Run `wiki-init` to set up your topic**
+
+   ```
+   init the wiki
+   ```
+
+   This creates the project-local qmd index (`.qmd/`), registers the `wiki` collection, and rebuilds the search index automatically — no manual `qmd init` step needed.
 
 ## Usage
 
