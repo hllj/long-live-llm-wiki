@@ -19,6 +19,8 @@ Two special files in `wiki/`:
 
 This wiki uses **qmd** (`npm install -g @tobilu/qmd`) as its local search engine. The `wiki` collection is pre-configured. Key commands:
 
+> **Project-local index:** Run all qmd commands from the repo root. If a `.qmd/` folder exists there (created by `wiki-init`), qmd automatically uses the project-local index instead of the global one. Check with `ls .qmd/` — if missing, run `qmd init` then `qmd collection add ./wiki --name <collection-name>` to register the collection.
+
 ```bash
 qmd query "<question>" --collection wiki --json --limit 8 2>/dev/null || true   # hybrid search + LLM re-ranking
 qmd search "<term>"   --collection wiki --json --limit 10 2>/dev/null || true   # fast keyword-only search

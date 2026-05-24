@@ -1,6 +1,7 @@
 # Feature 002: Wiki Init
 
 **Status:** Approved
+**Version:** 1.1.0
 **Created:** 2026-05-24
 **Branch:** `002-wiki-init`
 
@@ -81,6 +82,7 @@ When a user clones or forks the LLM Wiki Notebook, the repository arrives pre-po
 - [ ] **AC-3.1** Given `.gitignore` exists When the skill runs Then it appends a `# Wiki raw sources` section containing `raw/*` and `!raw/.gitkeep` if those lines are not already present.
 - [ ] **AC-3.2** Given `.gitignore` exists When the skill runs Then it appends `.backup/` under a `# Wiki backup` section if that line is not already present.
 - [ ] **AC-3.3** Given the lines are already present in `.gitignore` When the skill checks Then it does not add duplicate entries and reports "`.gitignore` already up to date."
+- [ ] **AC-3.4** Given `.gitignore` exists When the skill runs Then it appends `.qmd/` under a `# qmd local index` section if that line is not already present.
 
 ### Story 4: Reset wiki/index.md and wiki/log.md
 
@@ -93,15 +95,18 @@ When a user clones or forks the LLM Wiki Notebook, the repository arrives pre-po
 - [ ] **AC-4.2** Given `wiki/index.md` is written When the topic description is available Then the file begins with a `# <Topic Title>` heading followed by the user's topic description as a short paragraph.
 - [ ] **AC-4.3** Given cleanup is complete When `wiki/log.md` is written Then it contains exactly one entry: `## [YYYY-MM-DD] init | <Topic Title>` describing what was backed up, what was cleaned, and what stubs were created; prior log entries are not carried over.
 
-### Story 5: Rebuild the qmd search index
+### Story 5: Set up qmd project-local index and collection
 
-**As a** user whose wiki has just been restructured
-**I want** the search index updated immediately after init
-**So that** subsequent `wiki-query` and `wiki-ingest` calls operate against the correct post-init state
+**As a** user whose wiki has just been initialised
+**I want** qmd configured with a project-local index and the correct collection registered
+**So that** all subsequent `wiki-query` and `wiki-ingest` calls use the right local index without any manual setup
 
 **Acceptance criteria:**
-- [ ] **AC-5.1** Given all file writes are complete When the skill finishes Then it runs `qmd update --collection wiki 2>/dev/null || true` and reports success.
-- [ ] **AC-5.2** Given `qmd update` completes When the skill reports Then it confirms the index was refreshed and tells the user "Wiki initialized. Drop sources into `raw/` and run `wiki-ingest` to begin."
+- [ ] **AC-5.1** Given all file writes are complete When the skill runs `qmd init` Then a `.qmd/` folder is created in the repo root.
+- [ ] **AC-5.2** Given `qmd init` completes When the skill checks `qmd collection list` Then if `<collection-slug>` is absent it runs `qmd collection add ./wiki --name <collection-slug>`, where `<collection-slug>` is the kebab-case slug of the topic title from Step 1.
+- [ ] **AC-5.3** Given the collection is registered When the skill runs `qmd collection list` Then `<collection-slug>` appears in the output and is reported to the user.
+- [ ] **AC-5.4** Given the collection is registered When the skill runs `qmd update --collection <collection-slug>` Then the index is built and the skill confirms success.
+- [ ] **AC-5.5** Given all setup steps complete When the skill reports Then it tells the user "Wiki initialized. Drop sources into `raw/` and run `wiki-ingest` to begin."
 
 ---
 
@@ -163,7 +168,8 @@ The `.gitignore` update must be additive — it must not remove, reorder, or mod
 
 **Must:**
 - Append only if the required lines are absent.
-- Add lines under clearly labeled comment headers (`# Wiki raw sources`, `# Wiki backup`).
+- Add lines under clearly labeled comment headers (`# Wiki raw sources`, `# Wiki backup`, `# qmd local index`).
+- Exclude `.qmd/` under a `# qmd local index` section.
 
 **Must not:**
 - Overwrite the file; only append to it.
@@ -193,7 +199,8 @@ The `.gitignore` update must be additive — it must not remove, reorder, or mod
 | Backup copy fails (e.g. disk full) | Skill aborts, prints the failing file path and error, makes no deletions |
 | `.gitignore` does not exist | Skill creates it with only the two wiki sections; does not error |
 | `wiki/concepts/` (or sibling dir) does not exist | Skill skips deletion for that directory, creates it with `.gitkeep`, continues |
-| `qmd update` exits with non-zero code | Skill prints a warning "qmd index update failed — run `qmd update --collection wiki` manually" but does not fail the overall init |
+| `qmd init` fails (e.g. permission error) | Skill prints a warning "qmd init failed — run `qmd init` manually then `qmd collection add ./wiki --name <collection-slug>`" but does not fail the overall init |
+| `qmd update` exits with non-zero code | Skill prints a warning "qmd index update failed — run `qmd update --collection <collection-slug>` manually" but does not fail the overall init |
 | Entity or concept name contains characters invalid for a filename | Skill strips non-alphanumeric characters (except hyphens) to produce the slug; if the resulting slug is empty, it skips that stub and informs the user |
 
 ---

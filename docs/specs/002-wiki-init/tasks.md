@@ -316,7 +316,7 @@
 
 ### T007 — Update .gitignore
 
-- [ ] **T007** Check which lines are missing, then append them using the Edit tool on `/Users/hllj/Projects/LLM-Wiki-Notebook/.gitignore`. Append the following block at the end of the file if `raw/*` is absent:
+- [ ] **T007** Check which lines are missing, then append them using the Edit tool on `/Users/hllj/Projects/LLM-Wiki-Notebook/.gitignore`. Append the following block at the end of the file for any absent sections:
   ```
   
   # Wiki raw sources
@@ -325,9 +325,12 @@
   
   # Wiki backup
   .backup/
+  
+  # qmd local index
+  .qmd/
   ```
-  If `.backup/` line is absent but `raw/*` already present, append only the backup section.
-  If both are already present, skip and note "`.gitignore` already up to date."
+  Check each section independently and append only absent sections.
+  If all three are already present, skip and note "`.gitignore` already up to date."
 
 ---
 
@@ -481,17 +484,38 @@
 
 ---
 
-### T015 — Rebuild qmd index (AC-5.1)
+### T015 — Set up qmd project-local index and collection (AC-5.1–AC-5.4)
 
-- [ ] **T015** Run qmd update:
+`<collection-slug>` = kebab-case slug of the topic title from T011.
+
+- [ ] **T015a** Initialize project-local index:
   ```bash
-  qmd update --collection wiki 2>/dev/null || true
+  qmd init 2>/dev/null || true
+  ls .qmd/ 2>/dev/null && echo "ok" || echo "missing"
   ```
-  Then check index status:
+  Expected: `.qmd/` folder exists. If missing, warn the user to run `qmd init` manually.
+
+- [ ] **T015b** Check and register collection:
   ```bash
-  qmd status --collection wiki 2>/dev/null || true
+  qmd collection list 2>/dev/null || true
   ```
-  Expected: qmd reports an updated index. If output suggests failure before forced exit-0, warn the user to run `qmd update --collection wiki` manually.
+  If `<collection-slug>` is absent:
+  ```bash
+  qmd collection add ./wiki --name <collection-slug> 2>/dev/null || true
+  ```
+
+- [ ] **T015c** Confirm collection is listed:
+  ```bash
+  qmd collection list 2>/dev/null || true
+  ```
+  Expected: `<collection-slug>` appears in output. Report to user (AC-5.3).
+
+- [ ] **T015d** Build the index:
+  ```bash
+  qmd update --collection <collection-slug> 2>/dev/null || true
+  qmd status --collection <collection-slug> 2>/dev/null || true
+  ```
+  Expected: qmd reports an updated index. If output suggests failure before forced exit-0, warn the user to run `qmd update --collection <collection-slug>` manually.
 
 ---
 
