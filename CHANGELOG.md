@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.5.0] — 2026-05-25
+
+### Added
+
+- `wiki-init` now uses **`AskUserQuestion`** for topic collection — a single native UI dialog replaces the previous sequential Q&A flow, giving a cleaner user experience.
+- `wiki-init` now **generates a tailored `CLAUDE.md`** from `skills/wiki-init/CLAUDE.md.example` — substituting the topic title, description, and collection slug into the operational schema automatically.
+- `skills/wiki-init/CLAUDE.md.example` — new reference template for CLAUDE.md generation, so each wiki gets a correctly scoped operational schema out of the box.
+
+### Changed
+
+- `wiki-init` v2.0.0: removed the `.backup/` step — content is no longer copied before cleanup (simplifies the flow; raw sources stay in git history).
+- `wiki-init` Step 4 simplified: no entity/concept stub scaffolding; the skill now focuses on `CLAUDE.md` generation, index/log reset, and search index setup.
+- Docs updated: spec, plan, and tasks for `002-wiki-init` revised to reflect v2.0.0 workflow.
+
+---
+
 ## [0.4.0] — 2026-05-25
 
 ### Added
