@@ -17,3 +17,10 @@ npm-debug.log*
 
 # Claude local settings (machine-specific)
 .claude/settings.local.json
+
+# Wiki raw sources
+raw/*
+!raw/.gitkeep
+
+# Wiki backup
+.backup/
