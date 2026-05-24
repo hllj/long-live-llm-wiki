@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.0] — 2026-05-25
+
+### Added
+
+- `wiki-init` now sets up a **project-local qmd index** (`.qmd/`) automatically — runs `qmd init`, registers the `wiki` collection under a topic-derived slug, and rebuilds the index. No manual `qmd init` step needed after running `wiki-init`.
+- `.gitignore` updated by `wiki-init` to exclude `.qmd/` alongside `raw/*` and `.backup/`.
+- CLAUDE.md documents the project-local index convention and notes that all qmd commands should be run from the repo root.
+
+### Changed
+
+- Setup instructions in README updated: `wiki-init` replaces the manual `qmd init` + `qmd collection add` + `qmd update` steps for new installs.
+
+---
+
 ## [0.3.0] — 2026-05-24
 
 ### Added
