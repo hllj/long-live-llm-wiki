@@ -1,6 +1,6 @@
 # Tasks: Document Ingest Pipeline (Feature 003)
 
-**Plan:** [plan.md](plan.md)
+**Plan:** [plan.md](plan.md) (spec v3.0.0)
 **Branch:** `003-doc-ingest-pipeline`
 **Date:** 2026-06-03
 
@@ -14,62 +14,47 @@
 
 ## Group 0: Scaffold
 
-### T01 — Create tools/ scaffold
-**Files:** `tools/requirements.txt`, `tools/tests/__init__.py`, `tools/README.md`
+### T01 — Create skills/wiki-ingest/tools/ scaffold
+**Files:** `skills/wiki-ingest/tools/requirements.txt`, `skills/wiki-ingest/tools/tests/__init__.py`, `skills/wiki-ingest/tools/README.md`
 
-Create `tools/requirements.txt`:
+Move (or recreate) `tools/tests/__init__.py` → `skills/wiki-ingest/tools/tests/__init__.py` and remove the old `tools/` directory.
+
+Create `skills/wiki-ingest/tools/requirements.txt`:
 ```
 mineru[all]>=3.2.2
 google-genai>=1.0.0
 pytest>=8.0.0
 ```
 
-Create `tools/tests/__init__.py`: empty file (touch it).
+Create `skills/wiki-ingest/tools/tests/__init__.py`: empty file (touch it).
 
-Create `tools/README.md`:
+Create `skills/wiki-ingest/tools/README.md`:
 ```markdown
-# tools/
+# skills/wiki-ingest/tools/
 
-CLI tools for the document ingest pipeline (Feature 003).
+Internal tools for wiki-ingest binary document support (Feature 003).
+These scripts are called by the wiki-ingest skill — do not invoke them directly.
 
-## Setup
+## Developer Setup
 
 ```bash
-pip install -r tools/requirements.txt
+pip install -r skills/wiki-ingest/tools/requirements.txt
 ```
 
 > **First run:** `mineru[all]` downloads layout detection model weights (~several GB) on first
 > invocation. Ensure you have disk space and a stable connection before first use.
 
-## Usage
-
-### End-to-end (recommended)
+## Running tests
 
 ```bash
-export GEMINI_API_KEY=<your-key>
-python tools/ingest_doc.py raw/paper.pdf
-# Output: raw/paper.md
-```
-
-Options:
-- `--slug <name>` — custom output filename stem (default: derived from input filename)
-- `--force` — overwrite existing `raw/<slug>.md`
-- `--gemini-model <id>` — Gemini model (default: `gemini-3.5-flash`)
-
-### Individual tools
-
-```bash
-# Step 1: Convert PDF to markdown
-python tools/doc_to_markdown.py raw/paper.pdf --outdir /tmp/myout
-
-# Step 2: Enrich images
-python tools/enhance_images.py /tmp/myout/paper.md /tmp/myout/images --output raw/paper.md
+cd /path/to/repo
+python -m pytest skills/wiki-ingest/tools/tests/ -v
 ```
 ```
 
 **Verify:**
 ```bash
-ls /Users/hllj/Projects/long-live-wiki/tools/
+ls /Users/hllj/Projects/long-live-wiki/skills/wiki-ingest/tools/
 ```
 Expected: `README.md  requirements.txt  tests/`
 
@@ -77,7 +62,7 @@ Expected: `README.md  requirements.txt  tests/`
 
 ### T02 — Install dependencies
 ```bash
-cd /Users/hllj/Projects/long-live-wiki && pip install -r tools/requirements.txt
+cd /Users/hllj/Projects/long-live-wiki && pip install -r skills/wiki-ingest/tools/requirements.txt
 ```
 Expected: All packages install successfully. `python -c "import google.genai; print('ok')"` prints `ok`.
 
@@ -86,7 +71,7 @@ Expected: All packages install successfully. `python -c "import google.genai; pr
 ## Group 1: enhance_images.py (TDD)
 
 ### T03 — Write failing tests for `enrich()`
-**File:** `tools/tests/test_enhance_images.py`
+**File:** `skills/wiki-ingest/tools/tests/test_enhance_images.py`
 
 ```python
 import subprocess
@@ -189,7 +174,7 @@ def test_cli_missing_api_key(tmp_path):
 
     env = {"PATH": "/usr/bin:/bin"}  # no GEMINI_API_KEY
     result = subprocess.run(
-        [sys.executable, "tools/enhance_images.py", str(md_file), str(tmp_path / "images")],
+        [sys.executable, "skills/wiki-ingest/tools/enhance_images.py", str(md_file), str(tmp_path / "images")],
         capture_output=True,
         text=True,
         env=env,
@@ -202,14 +187,14 @@ def test_cli_missing_api_key(tmp_path):
 
 **Verify (RED):**
 ```bash
-cd /Users/hllj/Projects/long-live-wiki && python -m pytest tools/tests/test_enhance_images.py -v 2>&1 | head -30
+cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_enhance_images.py -v 2>&1 | head -30
 ```
 Expected: `ModuleNotFoundError: No module named 'enhance_images'` (5 errors) — file doesn't exist yet.
 
 ---
 
-### T04 — Implement `tools/enhance_images.py`
-**File:** `tools/enhance_images.py`
+### T04 — Implement `skills/wiki-ingest/tools/enhance_images.py`
+**File:** `skills/wiki-ingest/tools/enhance_images.py`
 
 ```python
 #!/usr/bin/env python3
@@ -344,7 +329,7 @@ if __name__ == "__main__":
 
 **Verify (GREEN):**
 ```bash
-cd /Users/hllj/Projects/long-live-wiki && python -m pytest tools/tests/test_enhance_images.py -v
+cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_enhance_images.py -v
 ```
 Expected: `5 passed`
 
@@ -353,7 +338,7 @@ Expected: `5 passed`
 ## Group 2: doc_to_markdown.py (TDD)
 
 ### T05 — Write failing tests for `convert()`
-**File:** `tools/tests/test_doc_to_markdown.py`
+**File:** `skills/wiki-ingest/tools/tests/test_doc_to_markdown.py`
 
 ```python
 import subprocess
@@ -405,7 +390,7 @@ def test_convert_exits_when_no_md_produced(tmp_path):
 def test_cli_file_not_found():
     """CLI exits 1 with 'Error: file not found' when input path does not exist."""
     result = subprocess.run(
-        [sys.executable, "tools/doc_to_markdown.py", "nonexistent_file.pdf"],
+        [sys.executable, "skills/wiki-ingest/tools/doc_to_markdown.py", "nonexistent_file.pdf"],
         capture_output=True,
         text=True,
         cwd="/Users/hllj/Projects/long-live-wiki",
@@ -450,14 +435,14 @@ def test_cli_prints_contract_lines(tmp_path):
 
 **Verify (RED):**
 ```bash
-cd /Users/hllj/Projects/long-live-wiki && python -m pytest tools/tests/test_doc_to_markdown.py -v 2>&1 | head -20
+cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_doc_to_markdown.py -v 2>&1 | head -20
 ```
 Expected: `ModuleNotFoundError: No module named 'doc_to_markdown'` — file doesn't exist yet.
 
 ---
 
-### T06 — Implement `tools/doc_to_markdown.py`
-**File:** `tools/doc_to_markdown.py`
+### T06 — Implement `skills/wiki-ingest/tools/doc_to_markdown.py`
+**File:** `skills/wiki-ingest/tools/doc_to_markdown.py`
 
 ```python
 #!/usr/bin/env python3
@@ -518,7 +503,7 @@ if __name__ == "__main__":
 
 **Verify (GREEN):**
 ```bash
-cd /Users/hllj/Projects/long-live-wiki && python -m pytest tools/tests/test_doc_to_markdown.py -v
+cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_doc_to_markdown.py -v
 ```
 Expected: `5 passed`
 
@@ -527,7 +512,7 @@ Expected: `5 passed`
 ## Group 3: ingest_doc.py (TDD)
 
 ### T07 — Write failing tests for `slugify`, `parse_tool_output`, and output-guard
-**File:** `tools/tests/test_ingest_doc.py`
+**File:** `skills/wiki-ingest/tools/tests/test_ingest_doc.py`
 
 ```python
 import subprocess
@@ -574,7 +559,7 @@ def test_parse_tool_output_handles_extra_lines():
 def test_cli_file_not_found():
     """CLI exits 1 with error message when input document doesn't exist."""
     result = subprocess.run(
-        [sys.executable, "tools/ingest_doc.py", "no_such_file.pdf"],
+        [sys.executable, "skills/wiki-ingest/tools/ingest_doc.py", "no_such_file.pdf"],
         capture_output=True,
         text=True,
         cwd="/Users/hllj/Projects/long-live-wiki",
@@ -591,7 +576,7 @@ def test_cli_output_exists_no_force(tmp_path):
         result = subprocess.run(
             [
                 sys.executable,
-                "tools/ingest_doc.py",
+                "skills/wiki-ingest/tools/ingest_doc.py",
                 "raw/attention.pdf",
                 "--slug",
                 "test-guard-sentinel",
@@ -609,14 +594,14 @@ def test_cli_output_exists_no_force(tmp_path):
 
 **Verify (RED):**
 ```bash
-cd /Users/hllj/Projects/long-live-wiki && python -m pytest tools/tests/test_ingest_doc.py -v 2>&1 | head -20
+cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_ingest_doc.py -v 2>&1 | head -20
 ```
 Expected: `ModuleNotFoundError: No module named 'ingest_doc'` — file doesn't exist yet.
 
 ---
 
-### T08 — Implement `tools/ingest_doc.py`
-**File:** `tools/ingest_doc.py`
+### T08 — Implement `skills/wiki-ingest/tools/ingest_doc.py`
+**File:** `skills/wiki-ingest/tools/ingest_doc.py`
 
 ```python
 #!/usr/bin/env python3
@@ -630,7 +615,7 @@ import tempfile
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 def slugify(name: str) -> str:
@@ -728,7 +713,7 @@ if __name__ == "__main__":
 
 **Verify (GREEN):**
 ```bash
-cd /Users/hllj/Projects/long-live-wiki && python -m pytest tools/tests/test_ingest_doc.py -v
+cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_ingest_doc.py -v
 ```
 Expected: `9 passed`
 
@@ -736,7 +721,7 @@ Expected: `9 passed`
 
 ### T09 — Run full unit test suite (all groups green)
 ```bash
-cd /Users/hllj/Projects/long-live-wiki && python -m pytest tools/tests/ -v
+cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/ -v
 ```
 Expected: `19 passed`, 0 failures.
 
@@ -747,20 +732,20 @@ Expected: `19 passed`, 0 failures.
 ### T10 — Verify error scenarios (no external services required)
 ```bash
 # File not found
-python tools/ingest_doc.py nonexistent.pdf
+python skills/wiki-ingest/tools/ingest_doc.py nonexistent.pdf
 ```
 Expected: exit 1, stderr contains `Error: file not found: nonexistent.pdf`
 
 ```bash
 # Missing GEMINI_API_KEY
-unset GEMINI_API_KEY && python tools/enhance_images.py /dev/null /tmp
+unset GEMINI_API_KEY && python skills/wiki-ingest/tools/enhance_images.py /dev/null /tmp
 ```
 Expected: exit 1, stderr contains `Error: GEMINI_API_KEY environment variable not set`
 
 ```bash
 # Output exists, no --force (attention.pdf → raw/attention.md if that exists, else use sentinel)
 touch raw/force-test-sentinel.md
-python tools/ingest_doc.py raw/attention.pdf --slug force-test-sentinel
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug force-test-sentinel
 ```
 Expected: exit 1, stderr contains `already exists. Use --force to overwrite.`
 
@@ -778,7 +763,7 @@ export GEMINI_API_KEY=<your-key>
 cd /Users/hllj/Projects/long-live-wiki
 
 # Run full pipeline on the existing fixture
-python tools/ingest_doc.py raw/attention.pdf --slug attention-test --force
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug attention-test --force
 ```
 
 Verify each AC:
@@ -799,16 +784,19 @@ grep "Figure description (Gemini)" raw/attention-test.md | head -5
 # AC-1.5: summary line in stdout (check terminal output for "Images found:")
 
 # AC-2.2: re-run without --force triggers guard
-python tools/ingest_doc.py raw/attention.pdf --slug attention-test
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug attention-test
 # Expected: exit 1, "already exists"
 
 # AC-4.1: custom slug
-python tools/ingest_doc.py raw/attention.pdf --slug my-attention --force
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug my-attention --force
 ls raw/my-attention.md
 
 # AC-4.2: default slug derived from filename
-python tools/ingest_doc.py raw/attention.pdf --force
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --force
 ls raw/attention.md
+
+# AC-1.7: wiki-ingest skips Step 0 for plain markdown
+# (manual: invoke wiki-ingest on raw/attention.md — confirm no "Step 0" output)
 ```
 
 Clean up test outputs:
@@ -818,23 +806,64 @@ rm -f raw/attention-test.md raw/my-attention.md
 
 ---
 
-## Group 5: Commit
+## Group 5: wiki-ingest SKILL.md update
 
-### T12 — Stage and commit all tools/
+### T11.5 — Add Step 0 pre-process block to `skills/wiki-ingest/SKILL.md`
+**File:** `skills/wiki-ingest/SKILL.md`
+**Implements:** FR-6
+**Covers:** AC-1.1 – AC-1.7, AC-2.1 – AC-2.2, AC-3.1 – AC-3.2
+
+Insert the following block immediately before the `### 1. Read the source` section:
+
+```markdown
+### 0. Pre-process document (binary sources only)
+
+Check the file extension of the source path the user provided.
+
+- If the extension is **`.pdf` or `.docx`**: run Step 0 before anything else.
+- If the extension is **`.md`** (or no extension / already markdown): skip to Step 1.
+
+**Running Step 0:**
+
+```bash
+export GEMINI_API_KEY=<your-key>
+python skills/wiki-ingest/tools/ingest_doc.py <source_path> [--slug <slug>] [--gemini-model <model>]
+```
+
+Display the full stdout output (images found, described, failures).
+
+After displaying the summary, ask the user:
+
+> "Pre-processing complete. Proceed with wiki ingest? [y/n]"
+
+- **If yes:** the enriched markdown at `raw/<slug>.md` is now the source for Step 1 onward.
+- **If no:** stop here — do not write any wiki pages.
+- **If the script exits non-zero (fatal error):** report the error and stop — do not write any wiki pages.
+```
+
+**Verify:**
+- Invoke wiki-ingest skill pointing at a `.pdf` source → confirm "Step 0: Pre-processing" fires.
+- Invoke wiki-ingest skill pointing at a `.md` source → confirm Step 0 is skipped.
+
+---
+
+## Group 6: Commit
+
+### T12 — Stage and commit all changes
 ```bash
 cd /Users/hllj/Projects/long-live-wiki
-git add tools/ docs/specs/003-doc-ingest-pipeline/
+git add skills/wiki-ingest/ docs/specs/003-doc-ingest-pipeline/
 git status
 ```
-Expected: shows `tools/` and `docs/specs/003-doc-ingest-pipeline/` as new files.
+Expected: shows `skills/wiki-ingest/tools/` (new files) and `skills/wiki-ingest/SKILL.md` (modified) and `docs/specs/003-doc-ingest-pipeline/` as modified files.
 
 ```bash
 git commit -m "$(cat <<'EOF'
-feat(tools): add document ingest pipeline with MinerU + Gemini image enrichment
+feat(wiki-ingest): add document ingest pipeline inside skill, integrate Step 0 pre-process
 
-Adds three composable CLI tools in tools/ that convert a PDF to markdown
-via MinerU Pro 2.5, enrich figure references with Gemini 3.5 Flash vision
-descriptions, and write the result to raw/ ready for wiki-ingest.
+Moves pipeline tools into skills/wiki-ingest/tools/ so the skill is
+self-contained. wiki-ingest now detects binary sources (PDF, DOCX) and
+runs MinerU + Gemini enrichment as Step 0 before writing any wiki pages.
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 EOF

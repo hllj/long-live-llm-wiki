@@ -1,6 +1,6 @@
 # Implementation Plan: Document Ingest Pipeline (Feature 003)
 
-**Spec:** [spec.md](spec.md) v1.1.0
+**Spec:** [spec.md](spec.md) v3.0.0
 **Research:** [research.md](research.md)
 **Date:** 2026-06-03
 
@@ -8,20 +8,22 @@
 
 ## Goal
 
-Build three composable Python tools in `tools/` that together convert a PDF document to an enriched markdown file (with Gemini-described figures) and save it to `raw/` ready for `wiki-ingest`.
+Extend `wiki-ingest` to accept binary source documents (PDF, DOCX) directly. Three internal Python tools in `skills/wiki-ingest/tools/` handle conversion and figure enrichment as Step 0; `skills/wiki-ingest/SKILL.md` is updated so wiki-ingest orchestrates the full journey from binary document to enriched wiki pages in a single invocation.
 
 ---
 
 ## Architecture
 
 ```
-tools/ingest_doc.py          ← orchestrator (end-to-end CLI)
+skills/wiki-ingest/SKILL.md          ← Step 0 pre-process block (new)
        │
-       ├── tools/doc_to_markdown.py   ← Layer 1: MinerU PDF→markdown
+skills/wiki-ingest/tools/ingest_doc.py   ← orchestrator (end-to-end CLI)
+       │
+       ├── skills/wiki-ingest/tools/doc_to_markdown.py   ← Layer 1: MinerU PDF→markdown
        │         invokes: mineru CLI via subprocess
        │         outputs: <tmpdir>/<stem>.md + <tmpdir>/images/
        │
-       └── tools/enhance_images.py   ← Layer 2: Gemini image enrichment
+       └── skills/wiki-ingest/tools/enhance_images.py   ← Layer 2: Gemini image enrichment
                  reads: markdown + images/
                  outputs: enriched markdown at raw/<slug>.md
 ```
@@ -54,15 +56,22 @@ input PDF
 ## File Structure
 
 ```
-tools/
-  doc_to_markdown.py     # MinerU conversion layer (FR-1)
-  enhance_images.py      # Gemini enrichment layer (FR-2, FR-3, FR-4)
-  ingest_doc.py          # Orchestrator (FR-5)
-  requirements.txt       # mineru[all], google-genai (NFR-3)
-  README.md              # Usage + first-run model download warning (NFR-5)
+skills/wiki-ingest/
+  SKILL.md               # Updated with Step 0 pre-process block (FR-6)
+  tools/
+    doc_to_markdown.py   # MinerU conversion layer (FR-1)
+    enhance_images.py    # Gemini enrichment layer (FR-2, FR-3, FR-4)
+    ingest_doc.py        # Orchestrator (FR-5)
+    requirements.txt     # mineru[all], google-genai (NFR-3)
+    README.md            # Usage + first-run model download warning (NFR-5)
+    tests/
+      __init__.py
+      test_enhance_images.py
+      test_doc_to_markdown.py
+      test_ingest_doc.py
 ```
 
-No modifications to `wiki/`, `raw/`, `skills/`, or `CLAUDE.md` — only `tools/` is created.
+No modifications to `wiki/`, `raw/`, or `CLAUDE.md` — only `skills/wiki-ingest/` is updated.
 
 ---
 
@@ -76,52 +85,35 @@ No modifications to `wiki/`, `raw/`, `skills/`, or `CLAUDE.md` — only `tools/`
 
 ## Phase 0: Scaffold and CLI Contracts
 
-**Creates:** `tools/requirements.txt`, `tools/README.md`
+**Creates:** `skills/wiki-ingest/tools/requirements.txt`, `skills/wiki-ingest/tools/README.md`
 
-**`tools/requirements.txt`:**
+**`skills/wiki-ingest/tools/requirements.txt`:**
 ```
 mineru[all]>=3.2.2
 google-genai>=1.0.0
 ```
 
-**`tools/README.md`:**
+**`skills/wiki-ingest/tools/README.md`:**
 ```markdown
-# tools/
+# skills/wiki-ingest/tools/
 
-CLI tools for the document ingest pipeline (Feature 003).
+Internal tools for wiki-ingest binary document support (Feature 003).
+These scripts are called by the wiki-ingest skill — do not invoke them directly.
 
-## Setup
+## Developer Setup
 
 ```bash
-pip install -r tools/requirements.txt
+pip install -r skills/wiki-ingest/tools/requirements.txt
 ```
 
 > **First run:** `mineru[all]` downloads layout detection model weights (~several GB) on first
 > invocation. Ensure you have disk space and a stable connection before first use.
 
-## Usage
-
-### End-to-end (recommended)
+## Running tests
 
 ```bash
-export GEMINI_API_KEY=<your-key>
-python tools/ingest_doc.py raw/paper.pdf
-# Output: raw/paper.md
-```
-
-Options:
-- `--slug <name>` — custom output filename stem (default: derived from input filename)
-- `--force` — overwrite existing `raw/<slug>.md`
-- `--gemini-model <id>` — Gemini model (default: `gemini-3.5-flash`)
-
-### Individual tools
-
-```bash
-# Step 1: Convert PDF to markdown (writes to tmpdir, prints paths to stdout)
-python tools/doc_to_markdown.py raw/paper.pdf --outdir /tmp/myout
-
-# Step 2: Enrich images in markdown
-python tools/enhance_images.py /tmp/myout/paper.md /tmp/myout/images --output raw/paper.md
+cd /path/to/repo
+python -m pytest skills/wiki-ingest/tools/tests/ -v
 ```
 ```
 
@@ -145,7 +137,7 @@ Exit codes:
 
 ---
 
-## Phase 1: `tools/doc_to_markdown.py`
+## Phase 1: `skills/wiki-ingest/tools/doc_to_markdown.py`
 
 **Implements:** FR-1 (MinerU conversion)
 **Covers:** AC-1.1, AC-1.2, AC-1.3, error scenarios: "file not found", "MinerU fails"
@@ -207,11 +199,11 @@ if __name__ == "__main__":
     main()
 ```
 
-**Manual verification:** `python tools/doc_to_markdown.py raw/attention.pdf` prints two `markdown:` / `images:` lines and exits 0.
+**Manual verification:** `python skills/wiki-ingest/tools/doc_to_markdown.py raw/attention.pdf` prints two `markdown:` / `images:` lines and exits 0.
 
 ---
 
-## Phase 2: `tools/enhance_images.py`
+## Phase 2: `skills/wiki-ingest/tools/enhance_images.py`
 
 **Implements:** FR-2 (image detection), FR-3 (Gemini), FR-4 (enrichment)
 **Covers:** AC-1.4, AC-1.5, AC-2.1, AC-3.1, AC-3.2, error scenarios: "GEMINI_API_KEY not set", "single image failure", "all failures"
@@ -349,12 +341,12 @@ if __name__ == "__main__":
 
 **Manual verification:**
 1. Obtain a markdown file with `![](images/foo.jpg)` references and a real image.
-2. `GEMINI_API_KEY=<key> python tools/enhance_images.py /tmp/test.md /tmp/images --output /tmp/enriched.md`
+2. `GEMINI_API_KEY=<key> python skills/wiki-ingest/tools/enhance_images.py /tmp/test.md /tmp/images --output /tmp/enriched.md`
 3. `grep "Figure description" /tmp/enriched.md` returns at least one match.
 
 ---
 
-## Phase 3: `tools/ingest_doc.py`
+## Phase 3: `skills/wiki-ingest/tools/ingest_doc.py`
 
 **Implements:** FR-5 (orchestrator CLI)
 **Covers:** AC-1.1–1.5, AC-2.2, AC-4.1, AC-4.2, error scenario: "output exists, no --force"
@@ -371,7 +363,7 @@ import tempfile
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 def slugify(name: str) -> str:
@@ -470,6 +462,43 @@ if __name__ == "__main__":
 
 ---
 
+## Phase 4.5: Update `skills/wiki-ingest/SKILL.md`
+
+**Implements:** FR-6 (wiki-ingest Step 0 integration)
+**Covers:** AC-5.1 – AC-5.5
+
+Insert a **Step 0: Pre-process document** block immediately before the existing `### 1. Read the source` section in `skills/wiki-ingest/SKILL.md`:
+
+```markdown
+### 0. Pre-process document (binary sources only)
+
+Check the file extension of the source path the user provided.
+
+- If the extension is **`.pdf` or `.docx`**: run Step 0 before anything else.
+- If the extension is **`.md`** (or no extension): skip to Step 1 — source is already markdown.
+
+**Running Step 0:**
+
+```bash
+export GEMINI_API_KEY=<your-key>
+python skills/wiki-ingest/tools/ingest_doc.py <source_path> [--slug <slug>] [--gemini-model <model>]
+```
+
+Display the full stdout output (conversion summary: images found, described, failures).
+
+After displaying the summary, ask the user:
+
+> "Pre-processing complete. Proceed with wiki ingest? [y/n]"
+
+- **If yes:** the enriched markdown at `raw/<slug>.md` is now the source for Step 1 onward.
+- **If no:** stop here. Do not write any wiki pages.
+- **If the script exits non-zero (fatal error):** report the error and stop. Do not write any wiki pages.
+```
+
+**Manual verification:** Pass a `.pdf` path to wiki-ingest and confirm Step 0 fires. Pass a `.md` path and confirm Step 0 is skipped.
+
+---
+
 ## Phase 4: Integration Verification
 
 **Test fixture:** `raw/attention.pdf` (already present in the repo)
@@ -480,7 +509,7 @@ Run the full pipeline end-to-end:
 export GEMINI_API_KEY=<your-key>
 
 # Run orchestrator on the existing test PDF
-python tools/ingest_doc.py raw/attention.pdf --slug attention-test --force
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug attention-test --force
 ```
 
 **Verification checklist (AC coverage):**
@@ -494,22 +523,23 @@ python tools/ingest_doc.py raw/attention.pdf --slug attention-test --force
 | AC-1.5 | Summary line printed | check stdout for `Images found:` |
 | AC-2.2 | Duplicate-run guard | re-run without `--force`, expect error message |
 | AC-3.1 | Placeholder on failure | inject bad image path, check placeholder inserted |
-| AC-4.1 | Custom slug | `python tools/ingest_doc.py raw/attention.pdf --slug my-custom` → `raw/my-custom.md` |
-| AC-4.2 | Default slug | `python tools/ingest_doc.py raw/attention.pdf --force` → `raw/attention.md` |
+| AC-4.1 | Custom slug | `python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug my-custom` → `raw/my-custom.md` |
+| AC-4.2 | Default slug | `python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --force` → `raw/attention.md` |
+| AC-5.1–5.5 | wiki-ingest Step 0 fires on PDF, skips on .md | manual skill invocation test |
 
 **Error scenario spot-checks:**
 ```bash
 # File not found
-python tools/ingest_doc.py nonexistent.pdf
+python skills/wiki-ingest/tools/ingest_doc.py nonexistent.pdf
 # Expected: "Error: file not found: nonexistent.pdf", exit 1
 
 # Missing API key
 unset GEMINI_API_KEY
-python tools/enhance_images.py /tmp/test.md /tmp/images
+python skills/wiki-ingest/tools/enhance_images.py /tmp/test.md /tmp/images
 # Expected: "Error: GEMINI_API_KEY environment variable not set", exit 1
 
 # Output exists, no --force
-python tools/ingest_doc.py raw/attention.pdf --slug attention-test
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug attention-test
 # Expected: "Error: raw/attention-test.md already exists. Use --force to overwrite.", exit 1
 ```
 
@@ -519,6 +549,11 @@ python tools/ingest_doc.py raw/attention.pdf --slug attention-test
 
 | FR | Phase | ✓ |
 |---|---|---|
+| FR-6.1 — SKILL.md Step 0 block | Phase 4.5 | ✓ |
+| FR-6.2 — extension detection | Phase 4.5 | ✓ |
+| FR-6.3 — orchestrator invocation | Phase 4.5 | ✓ |
+| FR-6.4 — user confirmation prompt | Phase 4.5 | ✓ |
+| FR-6.5 — enriched md as Steps 1–8 source | Phase 4.5 | ✓ |
 | FR-1.1 — MinerU CLI subprocess | Phase 1 | ✓ |
 | FR-1.2 — PDF input | Phase 1 | ✓ |
 | FR-1.3 — images/ subfolder | Phase 1 | ✓ |
@@ -531,10 +566,10 @@ python tools/ingest_doc.py raw/attention.pdf --slug attention-test
 | FR-4.1 — blockquote description format | Phase 2 | ✓ |
 | FR-4.2 — preserve original image lines | Phase 2 (`output.append(line)` before enrichment) | ✓ |
 | FR-4.3 — write to raw/<slug>.md | Phase 3 | ✓ |
-| FR-5.1 — composable tools | Phases 1–3 | ✓ |
-| FR-5.2 — orchestrator | Phase 3 | ✓ |
-| FR-5.3 — `--force` | Phase 3 | ✓ |
-| FR-5.4 — usage on missing args | Phase 3 (argparse) | ✓ |
+| FR-5.1 — doc_to_markdown stdout contract | Phase 1 | ✓ |
+| FR-5.2 — enhance_images stdout contract | Phase 2 | ✓ |
+| FR-5.3 — exit codes | Phases 1–3 | ✓ |
+| FR-5.4 — ingest_doc.py orchestration | Phase 3 | ✓ |
 | NFR-3 — requirements.txt | Phase 0 | ✓ |
 | NFR-4 — no hardcoded keys | All phases (env var only) | ✓ |
-| NFR-5 — first-run note | Phase 0 (README) | ✓ |
+| NFR-5 — developer README | Phase 0 | ✓ |

@@ -1,16 +1,18 @@
 ---
 name: wiki-ingest
 description: >
-  Processes a new source document into the LLM wiki. Use this skill whenever
-  the user wants to add, ingest, or process a file into the wiki — whether they
-  say "ingest this", "process raw/<file>", "I dropped a file in raw/", "add
-  this article to the wiki", or any similar phrasing. This skill handles the
-  complete ingest workflow: reading the source, collaborating with the user on
-  emphasis, using qmd to identify which existing pages are most affected,
-  writing a summary page, updating entity and concept pages throughout the wiki,
-  refreshing the index, and logging the activity. Trigger even when the user
-  only provides a file path and asks you to "process" or "read" it in context
-  of the wiki.
+  Processes a new source document into the LLM wiki. Accepts both markdown files
+  and binary documents (PDF, DOCX) — binary sources are automatically converted
+  to enriched markdown via MinerU + Gemini vision before wiki integration. Use
+  this skill whenever the user wants to add, ingest, or process a file into the
+  wiki — whether they say "ingest this", "process raw/<file>", "I dropped a
+  file in raw/", "add this article to the wiki", or any similar phrasing. Also
+  trigger when the user provides a PDF or DOCX path directly. This skill handles
+  the complete ingest workflow: optional binary pre-processing (Step 0), reading
+  the source, collaborating with the user on emphasis, using qmd to identify
+  which existing pages are most affected, writing a summary page, updating entity
+  and concept pages throughout the wiki, refreshing the index, and logging the
+  activity.
 ---
 
 # Wiki Ingest
@@ -18,6 +20,32 @@ description: >
 You are ingesting a new source document into the wiki. Your job is to extract its knowledge and weave it into the existing wiki structure — not just summarize it in isolation, but find where it connects, where it updates, and where it contradicts what's already there.
 
 ## Workflow
+
+### 0. Pre-process document (binary sources only)
+
+Check the file extension of the source path the user provided.
+
+- If the extension is **`.pdf` or `.docx`**: run Step 0 before anything else.
+- If the extension is **`.md`** (or already plain text / no extension): skip to Step 1.
+
+**Running Step 0:**
+
+```bash
+export GEMINI_API_KEY=<your-key>
+python skills/wiki-ingest/tools/ingest_doc.py <source_path> [--slug <slug>] [--gemini-model <model>]
+```
+
+Display the full stdout output (conversion progress and summary: images found, described, failures).
+
+After displaying the summary, ask the user:
+
+> "Pre-processing complete. Proceed with wiki ingest? [y/n]"
+
+- **If yes:** the enriched markdown at `raw/<slug>.md` is now the source for Step 1 onward.
+- **If no:** stop here — do not write any wiki pages.
+- **If the script exits non-zero (fatal error):** report the error and stop — do not write any wiki pages.
+
+---
 
 ### 1. Read the source
 
