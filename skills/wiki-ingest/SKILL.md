@@ -29,13 +29,25 @@ export GEMINI_API_KEY=<your-key>
 python skills/wiki-ingest/tools/ingest_doc.py <source_path> [--slug <slug>] [--gemini-model <model>]
 ```
 
-Display the full stdout output (conversion progress and summary: images found, described, failures).
+Let all output stream through without suppressing it. You will see:
+- `[MinerU]` lines as conversion progresses (plus heartbeat lines if MinerU is silent >5s)
+- Per-image `[Gemini] Describing figure N/M: ... done (1.2s)` lines during enrichment
+- A final summary block:
+  ```
+  Step 0 complete — see terminal output above for image summary
+  Intermediate artifacts saved to: raw/<slug>/
+  Final enriched markdown:         raw/<slug>.md
+  ```
 
-After displaying the summary, ask the user:
+**If the intermediate folder `raw/<slug>/` already exists**, the script shows a folder inspection report and prompts:
+- All stages complete (`step2_enhanced.md` present) → `Re-run Step 0 and overwrite? [y/N]` — answer on the user's behalf or ask them.
+- Only `step1_mineru_raw.md` present → offers to resume from Gemini enrichment only.
+
+**After the script finishes**, ask the user:
 
 > "Pre-processing complete. Proceed with wiki ingest? [y/n]"
 
-- **If yes:** the enriched markdown at `raw/<slug>.md` is now the source for Step 1 onward.
+- **If yes:** use `raw/<slug>.md` as the source for Step 1 onward.
 - **If no:** stop here — do not write any wiki pages.
 - **If the script exits non-zero (fatal error):** report the error and stop — do not write any wiki pages.
 

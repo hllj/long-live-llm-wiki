@@ -1,6 +1,6 @@
 # Tasks: Document Ingest Pipeline (Feature 003)
 
-**Plan:** [plan.md](plan.md) (spec v3.0.0)
+**Plan:** [plan.md](plan.md) (spec v3.1.0)
 **Branch:** `003-doc-ingest-pipeline`
 **Date:** 2026-06-03
 
@@ -26,7 +26,7 @@ google-genai>=1.0.0
 pytest>=8.0.0
 ```
 
-Create `skills/wiki-ingest/tools/tests/__init__.py`: empty file (touch it).
+Create `skills/wiki-ingest/tools/tests/__init__.py`: empty file.
 
 Create `skills/wiki-ingest/tools/README.md`:
 ```markdown
@@ -64,16 +64,17 @@ Expected: `README.md  requirements.txt  tests/`
 ```bash
 cd /Users/hllj/Projects/long-live-wiki && pip install -r skills/wiki-ingest/tools/requirements.txt
 ```
-Expected: All packages install successfully. `python -c "import google.genai; print('ok')"` prints `ok`.
+Expected: All packages install. `python -c "import google.genai; print('ok')"` prints `ok`.
 
 ---
 
 ## Group 1: enhance_images.py (TDD)
 
-### T03 — Write failing tests for `enrich()`
+### T03 — Write failing tests for `enrich()` and per-image progress output
 **File:** `skills/wiki-ingest/tools/tests/test_enhance_images.py`
 
 ```python
+import io
 import subprocess
 import sys
 from pathlib import Path
@@ -87,7 +88,6 @@ import enhance_images
 
 
 def test_enrich_inserts_description_after_image(tmp_path):
-    """enrich() appends a blockquote description immediately after each image line."""
     img = tmp_path / "images" / "abc.jpg"
     img.parent.mkdir()
     img.write_bytes(b"fake image content")
@@ -110,7 +110,6 @@ def test_enrich_inserts_description_after_image(tmp_path):
 
 
 def test_enrich_idempotent_skips_existing_description(tmp_path):
-    """enrich() does not duplicate descriptions if the marker already follows the image."""
     img = tmp_path / "images" / "abc.jpg"
     img.parent.mkdir()
     img.write_bytes(b"fake")
@@ -132,7 +131,6 @@ def test_enrich_idempotent_skips_existing_description(tmp_path):
 
 
 def test_enrich_missing_image_file_inserts_placeholder(tmp_path):
-    """enrich() inserts a placeholder and adds to failures when image file is absent."""
     (tmp_path / "images").mkdir()
     md = "# Doc\n\n![](images/missing.jpg)\n\nText.\n"
 
@@ -147,7 +145,6 @@ def test_enrich_missing_image_file_inserts_placeholder(tmp_path):
 
 
 def test_enrich_gemini_exception_inserts_error_placeholder(tmp_path):
-    """enrich() inserts an error placeholder and continues when Gemini raises."""
     img = tmp_path / "images" / "bad.jpg"
     img.parent.mkdir()
     img.write_bytes(b"fake")
@@ -166,13 +163,40 @@ def test_enrich_gemini_exception_inserts_error_placeholder(tmp_path):
     assert "API down" in result
 
 
+def test_enrich_prints_per_image_progress(tmp_path, capsys):
+    """enrich() prints '[Gemini] Describing figure N/M: ...' before each API call."""
+    img = tmp_path / "images" / "fig1.png"
+    img.parent.mkdir()
+    img.write_bytes(b"fake")
+
+    md = "# Doc\n\n![](images/fig1.png)\n"
+
+    with patch.object(enhance_images, "describe_image", return_value="A chart."):
+        enhance_images.enrich(md, tmp_path, MagicMock(), "gemini-3.5-flash")
+
+    captured = capsys.readouterr()
+    assert "[Gemini] Describing figure 1/1: images/fig1.png" in captured.out
+    assert "done" in captured.out
+
+
+def test_enrich_prints_failed_on_missing_file(tmp_path, capsys):
+    """enrich() prints FAILED inline when the image file is absent."""
+    (tmp_path / "images").mkdir()
+    md = "# Doc\n\n![](images/gone.png)\n"
+
+    enhance_images.enrich(md, tmp_path, MagicMock(), "gemini-3.5-flash")
+
+    captured = capsys.readouterr()
+    assert "FAILED" in captured.out
+    assert "gone.png" in captured.out
+
+
 def test_cli_missing_api_key(tmp_path):
-    """CLI exits 1 with a clear message when GEMINI_API_KEY is not set."""
     md_file = tmp_path / "test.md"
     md_file.write_text("# Test\n")
     (tmp_path / "images").mkdir()
 
-    env = {"PATH": "/usr/bin:/bin"}  # no GEMINI_API_KEY
+    env = {"PATH": "/usr/bin:/bin"}
     result = subprocess.run(
         [sys.executable, "skills/wiki-ingest/tools/enhance_images.py", str(md_file), str(tmp_path / "images")],
         capture_output=True,
@@ -183,168 +207,66 @@ def test_cli_missing_api_key(tmp_path):
 
     assert result.returncode == 1
     assert "GEMINI_API_KEY" in result.stderr
+
+
+def test_cli_writes_step2_enhanced_by_default(tmp_path):
+    """CLI writes step2_enhanced.md sibling when --output is not given."""
+    img = tmp_path / "images" / "fig.png"
+    img.parent.mkdir()
+    img.write_bytes(b"fake")
+    md_file = tmp_path / "step1_mineru_raw.md"
+    md_file.write_text("# Doc\n\n![](images/fig.png)\n")
+
+    with patch.object(enhance_images, "describe_image", return_value="desc"):
+        with patch("sys.argv", ["enhance_images.py", str(md_file), str(tmp_path / "images")]):
+            with patch.dict("os.environ", {"GEMINI_API_KEY": "fake-key"}):
+                with patch("google.genai.Client"):
+                    try:
+                        enhance_images.main()
+                    except SystemExit:
+                        pass
+
+    step2 = tmp_path / "step2_enhanced.md"
+    assert step2.exists()
 ```
 
 **Verify (RED):**
 ```bash
 cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_enhance_images.py -v 2>&1 | head -30
 ```
-Expected: `ModuleNotFoundError: No module named 'enhance_images'` (5 errors) — file doesn't exist yet.
+Expected: `ModuleNotFoundError: No module named 'enhance_images'` — file doesn't exist yet.
 
 ---
 
 ### T04 — Implement `skills/wiki-ingest/tools/enhance_images.py`
 **File:** `skills/wiki-ingest/tools/enhance_images.py`
 
-```python
-#!/usr/bin/env python3
-"""Enrich markdown image references with Gemini vision descriptions."""
-import argparse
-import os
-import re
-import sys
-from pathlib import Path
-
-import google.genai as genai
-from google.genai import types
-
-
-IMAGE_RE = re.compile(r'(!\[.*?\]\((images/[^)]+)\))')
-DESCRIPTION_MARKER = "**Figure description (Gemini):**"
-GEMINI_PROMPT = (
-    "You are analyzing a figure from a technical research document. "
-    "Describe this figure in detail: what it shows, what data or relationships "
-    "it represents, and its likely purpose in the context of the document. "
-    "Be specific and technical. Limit your response to 3-5 sentences."
-)
-MIME_MAP = {
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "png": "image/png",
-    "gif": "image/gif",
-    "webp": "image/webp",
-}
-
-
-def describe_image(client: genai.Client, image_path: Path, model: str) -> str:
-    with open(image_path, "rb") as f:
-        image_bytes = f.read()
-    mime_type = MIME_MAP.get(image_path.suffix.lower().lstrip("."), "image/jpeg")
-    response = client.models.generate_content(
-        model=model,
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-            GEMINI_PROMPT,
-        ],
-    )
-    return response.text.strip()
-
-
-def enrich(
-    markdown_text: str,
-    images_dir: Path,
-    client: genai.Client,
-    model: str,
-) -> tuple[str, int, int, list[str]]:
-    """Insert Gemini descriptions after each image reference.
-
-    Returns (enriched_text, images_found, images_described, failed_refs).
-    Idempotent: skips image lines that already have a description block below them.
-    """
-    lines = markdown_text.splitlines(keepends=True)
-    output: list[str] = []
-    found = described = 0
-    failures: list[str] = []
-
-    for i, line in enumerate(lines):
-        output.append(line)
-        match = IMAGE_RE.search(line)
-        if not match:
-            continue
-
-        img_rel = match.group(2)
-        found += 1
-
-        # Idempotency: if the very next non-empty line already has the marker, skip
-        next_lines = [l for l in lines[i + 1 : i + 4] if l.strip()]
-        if next_lines and DESCRIPTION_MARKER in next_lines[0]:
-            continue
-
-        img_path = images_dir / Path(img_rel).name
-        if not img_path.exists():
-            failures.append(img_rel)
-            output.append(f"> {DESCRIPTION_MARKER} [image file not found: {img_rel}]\n")
-            continue
-
-        try:
-            description = describe_image(client, img_path, model)
-            output.append(f"> {DESCRIPTION_MARKER} {description}\n")
-            described += 1
-        except Exception as exc:
-            failures.append(img_rel)
-            output.append(f"> {DESCRIPTION_MARKER} [Gemini error — could not process image: {exc}]\n")
-
-    return "".join(output), found, described, failures
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Enrich markdown image references with Gemini descriptions"
-    )
-    parser.add_argument("markdown", help="Path to input markdown file")
-    parser.add_argument("images_dir", help="Path to directory containing extracted images")
-    parser.add_argument("--output", help="Output path (default: overwrite input)")
-    parser.add_argument("--gemini-model", default="gemini-3.5-flash", help="Gemini model ID")
-    args = parser.parse_args()
-
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        print("Error: GEMINI_API_KEY environment variable not set", file=sys.stderr)
-        sys.exit(1)
-
-    md_path = Path(args.markdown)
-    if not md_path.exists():
-        print(f"Error: file not found: {md_path}", file=sys.stderr)
-        sys.exit(1)
-
-    images_dir = Path(args.images_dir)
-    client = genai.Client(api_key=api_key)
-
-    text = md_path.read_text(encoding="utf-8")
-    enriched, found, described, failures = enrich(text, images_dir, client, args.gemini_model)
-
-    out_path = Path(args.output) if args.output else md_path
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(enriched, encoding="utf-8")
-
-    print(f"Images found: {found} | Described: {described} | Failed: {len(failures)}")
-    if failures:
-        print(f"Failed images: {', '.join(failures)}", file=sys.stderr)
-        sys.exit(2)
-
-
-if __name__ == "__main__":
-    main()
-```
+Implement exactly as shown in plan.md Phase 2. Key requirements:
+- `enrich()` prints `[Gemini] Describing figure {idx}/{total}: {img_rel} ... ` (no newline, flushed) before each API call
+- Appends `done ({elapsed}s)` or `FAILED ({reason}) ({elapsed}s)` on the same line
+- Default output path is `md_path.parent / "step2_enhanced.md"` (not overwriting input)
+- Prints `step2 written: <path>` after writing
 
 **Verify (GREEN):**
 ```bash
 cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_enhance_images.py -v
 ```
-Expected: `5 passed`
+Expected: `8 passed`
 
 ---
 
 ## Group 2: doc_to_markdown.py (TDD)
 
-### T05 — Write failing tests for `convert()`
+### T05 — Write failing tests for `convert()` [P]
 **File:** `skills/wiki-ingest/tools/tests/test_doc_to_markdown.py`
 
 ```python
+import io
 import subprocess
 import sys
+import threading
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 import pytest
 
@@ -353,44 +275,72 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import doc_to_markdown
 
 
-def test_convert_finds_nested_markdown(tmp_path):
-    """convert() returns the .md file path even when MinerU nests it in a subdirectory."""
-    nested = tmp_path / "paper" / "auto"
-    nested.mkdir(parents=True)
+def _make_popen_mock(lines: list[str], returncode: int = 0):
+    """Helper: mock Popen that yields lines from stdout iterator."""
+    mock_proc = MagicMock()
+    mock_proc.stdout.__iter__ = MagicMock(return_value=iter(lines))
+    mock_proc.poll.return_value = returncode
+    mock_proc.returncode = returncode
+    mock_proc.wait.return_value = None
+    return mock_proc
+
+
+def test_convert_produces_step1_mineru_raw(tmp_path):
+    """convert() copies MinerU output to step1_mineru_raw.md in workdir."""
+    nested = tmp_path / "auto"
+    nested.mkdir()
     md_file = nested / "paper.md"
     md_file.write_text("# Paper\n")
     (nested / "images").mkdir()
 
-    with patch.object(doc_to_markdown.subprocess, "run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stderr="")
-        md_path, images_dir = doc_to_markdown.convert(Path("fake.pdf"), tmp_path)
+    with patch("doc_to_markdown.subprocess.Popen") as mock_popen:
+        mock_popen.return_value = _make_popen_mock(["Processing...\n"])
+        step1, images_dir = doc_to_markdown.convert(Path("fake.pdf"), tmp_path)
 
-    assert md_path == md_file
-    assert images_dir == nested / "images"
+    assert step1 == tmp_path / "step1_mineru_raw.md"
+    assert step1.exists()
+    assert images_dir == tmp_path / "images"
 
 
 def test_convert_exits_when_mineru_fails(tmp_path):
-    """convert() calls sys.exit(1) and prints stderr when MinerU returns non-zero."""
-    with patch.object(doc_to_markdown.subprocess, "run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=1, stderr="mineru: model load failed")
+    """convert() calls sys.exit(1) when MinerU returns non-zero."""
+    with patch("doc_to_markdown.subprocess.Popen") as mock_popen:
+        mock_popen.return_value = _make_popen_mock(["error\n"], returncode=1)
         with pytest.raises(SystemExit) as exc:
             doc_to_markdown.convert(Path("fake.pdf"), tmp_path)
     assert exc.value.code == 1
 
 
 def test_convert_exits_when_no_md_produced(tmp_path):
-    """convert() calls sys.exit(1) when MinerU succeeds but produces no .md file."""
-    with patch.object(doc_to_markdown.subprocess, "run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stderr="")
+    """convert() exits 1 when MinerU succeeds but produces no .md file."""
+    with patch("doc_to_markdown.subprocess.Popen") as mock_popen:
+        mock_popen.return_value = _make_popen_mock([])
         with pytest.raises(SystemExit) as exc:
             doc_to_markdown.convert(Path("fake.pdf"), tmp_path)
     assert exc.value.code == 1
 
 
+def test_convert_prefixes_mineru_lines(tmp_path, capsys):
+    """convert() prints streamed lines prefixed with '[MinerU] '."""
+    nested = tmp_path / "auto"
+    nested.mkdir()
+    (nested / "out.md").write_text("# x\n")
+    (nested / "images").mkdir()
+
+    with patch("doc_to_markdown.subprocess.Popen") as mock_popen:
+        mock_popen.return_value = _make_popen_mock(["page 1\n", "page 2\n"])
+        doc_to_markdown.convert(Path("fake.pdf"), tmp_path)
+
+    captured = capsys.readouterr()
+    assert "[MinerU] page 1" in captured.out
+    assert "[MinerU] page 2" in captured.out
+
+
 def test_cli_file_not_found():
     """CLI exits 1 with 'Error: file not found' when input path does not exist."""
     result = subprocess.run(
-        [sys.executable, "skills/wiki-ingest/tools/doc_to_markdown.py", "nonexistent_file.pdf"],
+        [sys.executable, "skills/wiki-ingest/tools/doc_to_markdown.py",
+         "nonexistent_file.pdf", "--workdir", "/tmp/nowhere"],
         capture_output=True,
         text=True,
         cwd="/Users/hllj/Projects/long-live-wiki",
@@ -399,125 +349,78 @@ def test_cli_file_not_found():
     assert "Error: file not found" in result.stderr
 
 
+def test_cli_requires_workdir():
+    """CLI exits non-zero when --workdir is omitted."""
+    result = subprocess.run(
+        [sys.executable, "skills/wiki-ingest/tools/doc_to_markdown.py", "raw/attention.pdf"],
+        capture_output=True,
+        text=True,
+        cwd="/Users/hllj/Projects/long-live-wiki",
+    )
+    assert result.returncode != 0
+
+
 def test_cli_prints_contract_lines(tmp_path):
-    """CLI prints 'markdown:<path>' and 'images:<path>' lines on success."""
+    """CLI prints 'markdown:<path>' and 'images:<path>' on success."""
     fake_pdf = tmp_path / "test.pdf"
     fake_pdf.write_bytes(b"%PDF fake")
-
-    nested = tmp_path / "test" / "auto"
-    nested.mkdir(parents=True)
-    md_file = nested / "test.md"
-    md_file.write_text("# Test\n")
+    nested = tmp_path / "auto"
+    nested.mkdir()
+    (nested / "test.md").write_text("# Test\n")
     (nested / "images").mkdir()
 
-    with patch("doc_to_markdown.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stderr="")
-        # Run via importlib to avoid subprocess overhead
-        import importlib, io
+    with patch("doc_to_markdown.subprocess.Popen") as mock_popen:
+        mock_popen.return_value = _make_popen_mock([])
+        import io
         from contextlib import redirect_stdout
-        doc_to_markdown_mod = importlib.import_module("doc_to_markdown")
-
         buf = io.StringIO()
         with redirect_stdout(buf):
-            doc_to_markdown_mod.convert(fake_pdf, tmp_path)
+            with patch("sys.argv", ["doc_to_markdown.py", str(fake_pdf), "--workdir", str(tmp_path)]):
+                doc_to_markdown.main()
 
-    # convert() itself doesn't print; main() does — test that contract format is correct
-    # by checking that the output lines from main() parse correctly
-    with patch("doc_to_markdown.convert", return_value=(md_file, nested / "images")):
-        with patch("sys.argv", ["doc_to_markdown.py", str(fake_pdf)]):
-            buf = io.StringIO()
-            with redirect_stdout(buf):
-                doc_to_markdown_mod.main()
     output = buf.getvalue()
-    assert f"markdown:{md_file}" in output
-    assert f"images:{nested / 'images'}" in output
+    assert "markdown:" in output
+    assert "step1_mineru_raw.md" in output
+    assert "images:" in output
 ```
 
 **Verify (RED):**
 ```bash
 cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_doc_to_markdown.py -v 2>&1 | head -20
 ```
-Expected: `ModuleNotFoundError: No module named 'doc_to_markdown'` — file doesn't exist yet.
+Expected: `ModuleNotFoundError: No module named 'doc_to_markdown'`
 
 ---
 
-### T06 — Implement `skills/wiki-ingest/tools/doc_to_markdown.py`
+### T06 — Implement `skills/wiki-ingest/tools/doc_to_markdown.py` [P]
 **File:** `skills/wiki-ingest/tools/doc_to_markdown.py`
 
-```python
-#!/usr/bin/env python3
-"""Convert a document to markdown using MinerU CLI."""
-import argparse
-import subprocess
-import sys
-import tempfile
-from pathlib import Path
-
-
-def convert(doc_path: Path, outdir: Path) -> tuple[Path, Path]:
-    result = subprocess.run(
-        ["mineru", "-p", str(doc_path), "-o", str(outdir)],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        print(result.stderr, file=sys.stderr)
-        sys.exit(1)
-
-    # MinerU may nest output under a subdir named after the input stem.
-    # Find the first .md file produced anywhere under outdir.
-    md_files = sorted(Path(outdir).rglob("*.md"))
-    if not md_files:
-        print(f"Error: MinerU produced no markdown output in {outdir}", file=sys.stderr)
-        sys.exit(1)
-
-    md_path = md_files[0]
-    images_dir = md_path.parent / "images"
-    return md_path, images_dir
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Convert document to markdown via MinerU")
-    parser.add_argument("document", help="Path to input document (PDF)")
-    parser.add_argument("--outdir", help="Output directory (default: auto temp dir)")
-    args = parser.parse_args()
-
-    doc_path = Path(args.document)
-    if not doc_path.exists():
-        print(f"Error: file not found: {doc_path}", file=sys.stderr)
-        sys.exit(1)
-
-    outdir = Path(args.outdir) if args.outdir else Path(tempfile.mkdtemp(prefix="mineru_"))
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    md_path, images_dir = convert(doc_path, outdir)
-
-    # Print contract lines for the orchestrator to parse
-    print(f"markdown:{md_path}")
-    print(f"images:{images_dir}")
-
-
-if __name__ == "__main__":
-    main()
-```
+Implement exactly as shown in plan.md Phase 1. Key requirements:
+- `subprocess.Popen` (not `subprocess.run`) so MinerU output is streamed line by line
+- Daemon heartbeat thread that prints `[MinerU] still running... elapsed: Xs` every 5s of silence
+- After MinerU exits, `shutil.copy2` the found `.md` to `workdir/step1_mineru_raw.md`
+- Move `images/` to `workdir/images/` if it's nested in a MinerU subdirectory
+- `--workdir` is a required argument (replaces old `--outdir`)
+- Contract output: `markdown:<workdir>/step1_mineru_raw.md` and `images:<workdir>/images`
 
 **Verify (GREEN):**
 ```bash
 cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_doc_to_markdown.py -v
 ```
-Expected: `5 passed`
+Expected: `7 passed`
 
 ---
 
 ## Group 3: ingest_doc.py (TDD)
 
-### T07 — Write failing tests for `slugify`, `parse_tool_output`, and output-guard
+### T07 — Write failing tests for orchestrator logic
 **File:** `skills/wiki-ingest/tools/tests/test_ingest_doc.py`
 
 ```python
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -542,180 +445,104 @@ def test_slugify_collapses_multiple_separators():
     assert ingest_doc.slugify("hello   world") == "hello-world"
 
 
-def test_parse_tool_output_extracts_paths():
-    stdout = "markdown:/tmp/out/paper.md\nimages:/tmp/out/images\n"
+def test_parse_tool_output_extracts_contract_lines():
+    stdout = "markdown:/tmp/out/step1_mineru_raw.md\nimages:/tmp/out/images\n"
     result = ingest_doc.parse_tool_output(stdout)
-    assert result["markdown"] == "/tmp/out/paper.md"
+    assert result["markdown"] == "/tmp/out/step1_mineru_raw.md"
     assert result["images"] == "/tmp/out/images"
 
 
-def test_parse_tool_output_handles_extra_lines():
-    stdout = "[1/2] Converting...\nmarkdown:/tmp/a.md\nimages:/tmp/imgs\nDone.\n"
+def test_parse_tool_output_skips_mineru_progress_lines():
+    stdout = (
+        "[MinerU] Processing page 1/15...\n"
+        "[MinerU] still running... elapsed: 12s\n"
+        "markdown:/tmp/step1_mineru_raw.md\n"
+        "images:/tmp/images\n"
+        "[MinerU] Done.\n"
+    )
     result = ingest_doc.parse_tool_output(stdout)
-    assert result["markdown"] == "/tmp/a.md"
-    assert result["images"] == "/tmp/imgs"
+    assert result["markdown"] == "/tmp/step1_mineru_raw.md"
+    assert result["images"] == "/tmp/images"
+    assert "MinerU" not in result
+
+
+def test_parse_tool_output_skips_gemini_progress_lines():
+    stdout = (
+        "[Gemini] Describing figure 1/5: images/fig.png ... done (1.2s)\n"
+        "Images found: 5 | Described: 5 | Failed: 0\n"
+        "step2 written: raw/slug/step2_enhanced.md\n"
+    )
+    result = ingest_doc.parse_tool_output(stdout)
+    assert "Images found" not in result
+    assert "step2 written" not in result
+
+
+def test_inspect_workdir_detects_existing_files(tmp_path):
+    (tmp_path / "step1_mineru_raw.md").write_text("# x\n")
+    (tmp_path / "images").mkdir()
+    state = ingest_doc.inspect_workdir(tmp_path)
+    assert state["step1"] is True
+    assert state["images"] is True
+    assert state["step2"] is False
+
+
+def test_write_log_creates_file(tmp_path):
+    ingest_doc.write_log(tmp_path, {"document": "test.pdf", "elapsed_s": "12.3", "exit_code": 0}, force=False)
+    log = (tmp_path / "ingest.log").read_text()
+    assert "document: test.pdf" in log
+    assert "elapsed_s: 12.3" in log
+    assert "Run " in log
+
+
+def test_write_log_appends_on_re_run(tmp_path):
+    ingest_doc.write_log(tmp_path, {"exit_code": 0}, force=False)
+    ingest_doc.write_log(tmp_path, {"exit_code": 0}, force=False)
+    log = (tmp_path / "ingest.log").read_text()
+    assert log.count("=== Run") == 2
+
+
+def test_write_log_overwrites_with_force(tmp_path):
+    ingest_doc.write_log(tmp_path, {"exit_code": 0}, force=False)
+    ingest_doc.write_log(tmp_path, {"exit_code": 0}, force=True)
+    log = (tmp_path / "ingest.log").read_text()
+    assert log.count("=== Run") == 1
 
 
 def test_cli_file_not_found():
-    """CLI exits 1 with error message when input document doesn't exist."""
     result = subprocess.run(
         [sys.executable, "skills/wiki-ingest/tools/ingest_doc.py", "no_such_file.pdf"],
-        capture_output=True,
-        text=True,
+        capture_output=True, text=True,
         cwd="/Users/hllj/Projects/long-live-wiki",
     )
     assert result.returncode == 1
     assert "Error: file not found" in result.stderr
-
-
-def test_cli_output_exists_no_force(tmp_path):
-    """CLI exits 1 with 'already exists' when output slug exists and --force is absent."""
-    sentinel = Path("/Users/hllj/Projects/long-live-wiki/raw/test-guard-sentinel.md")
-    sentinel.write_text("# existing\n")
-    try:
-        result = subprocess.run(
-            [
-                sys.executable,
-                "skills/wiki-ingest/tools/ingest_doc.py",
-                "raw/attention.pdf",
-                "--slug",
-                "test-guard-sentinel",
-            ],
-            capture_output=True,
-            text=True,
-            cwd="/Users/hllj/Projects/long-live-wiki",
-        )
-        assert result.returncode == 1
-        assert "already exists" in result.stderr
-        assert "--force" in result.stderr
-    finally:
-        sentinel.unlink(missing_ok=True)
 ```
 
 **Verify (RED):**
 ```bash
 cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_ingest_doc.py -v 2>&1 | head -20
 ```
-Expected: `ModuleNotFoundError: No module named 'ingest_doc'` — file doesn't exist yet.
+Expected: `ModuleNotFoundError: No module named 'ingest_doc'`
 
 ---
 
 ### T08 — Implement `skills/wiki-ingest/tools/ingest_doc.py`
 **File:** `skills/wiki-ingest/tools/ingest_doc.py`
 
-```python
-#!/usr/bin/env python3
-"""Orchestrate doc_to_markdown + enhance_images and write output to raw/."""
-import argparse
-import re
-import shutil
-import subprocess
-import sys
-import tempfile
-from pathlib import Path
-
-
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-
-
-def slugify(name: str) -> str:
-    slug = name.lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", slug)
-    return slug.strip("-")
-
-
-def parse_tool_output(stdout: str) -> dict[str, str]:
-    result: dict[str, str] = {}
-    for line in stdout.splitlines():
-        if ":" in line:
-            key, _, val = line.partition(":")
-            result[key.strip()] = val.strip()
-    return result
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Ingest a document into raw/ with Gemini-enriched figures"
-    )
-    parser.add_argument("document", help="Path to input document (PDF)")
-    parser.add_argument("--slug", help="Output slug (default: derived from filename)")
-    parser.add_argument("--force", action="store_true", help="Overwrite existing output")
-    parser.add_argument("--gemini-model", default="gemini-3.5-flash", help="Gemini model ID")
-    args = parser.parse_args()
-
-    doc_path = Path(args.document)
-    if not doc_path.exists():
-        print(f"Error: file not found: {doc_path}", file=sys.stderr)
-        sys.exit(1)
-
-    slug = args.slug or slugify(doc_path.stem)
-    out_path = REPO_ROOT / "raw" / f"{slug}.md"
-
-    if out_path.exists() and not args.force:
-        print(
-            f"Error: raw/{slug}.md already exists. Use --force to overwrite.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    tools_dir = Path(__file__).resolve().parent
-
-    with tempfile.TemporaryDirectory(prefix="ingest_") as tmpdir:
-        # Step 1: MinerU conversion
-        print(f"[1/2] Converting {doc_path.name} with MinerU...")
-        r1 = subprocess.run(
-            [sys.executable, str(tools_dir / "doc_to_markdown.py"), str(doc_path), "--outdir", tmpdir],
-            capture_output=True,
-            text=True,
-        )
-        if r1.returncode != 0:
-            print(r1.stderr, file=sys.stderr)
-            sys.exit(1)
-
-        paths = parse_tool_output(r1.stdout)
-        md_path = Path(paths.get("markdown", ""))
-        images_dir = Path(paths.get("images", ""))
-
-        if not md_path or not md_path.exists():
-            print("Error: doc_to_markdown.py did not produce a markdown file", file=sys.stderr)
-            sys.exit(1)
-
-        # Step 2: Gemini enrichment — write to tmp first, then copy to raw/
-        enriched_tmp = Path(tmpdir) / f"{slug}.md"
-        print(f"[2/2] Enriching figures with {args.gemini_model}...")
-        r2 = subprocess.run(
-            [
-                sys.executable,
-                str(tools_dir / "enhance_images.py"),
-                str(md_path),
-                str(images_dir),
-                "--output", str(enriched_tmp),
-                "--gemini-model", args.gemini_model,
-            ],
-            capture_output=True,
-            text=True,
-        )
-        print(r2.stdout.strip())
-        if r2.returncode == 1:
-            print(r2.stderr, file=sys.stderr)
-            sys.exit(1)
-        if r2.returncode == 2:
-            print(f"Warning: {r2.stderr.strip()}", file=sys.stderr)
-
-        # Step 3: Copy enriched markdown to raw/
-        shutil.copy2(enriched_tmp, out_path)
-        print(f"Output: raw/{slug}.md")
-
-
-if __name__ == "__main__":
-    main()
-```
+Implement exactly as shown in plan.md Phase 3. Key requirements:
+- Creates `raw/<slug>/` as a **permanent** workdir (no `tempfile.TemporaryDirectory`)
+- If `workdir` exists and `--force` not set: calls `inspect_workdir` + `report_workdir`, prompts user, sets `skip_step1`/`skip_step2` flags appropriately
+- Calls sub-tools via `stream_subprocess` (Popen-based) so their output streams live
+- `parse_tool_output` skips lines starting with `[` (progress lines)
+- Calls `write_log(workdir, entry, args.force)` after promotion
+- Promotes `raw/<slug>/step2_enhanced.md` → `raw/<slug>.md` via `shutil.copy2`
+- Prints final summary with paths to intermediate folder and final .md
 
 **Verify (GREEN):**
 ```bash
 cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/test_ingest_doc.py -v
 ```
-Expected: `9 passed`
+Expected: `11 passed`
 
 ---
 
@@ -723,7 +550,7 @@ Expected: `9 passed`
 ```bash
 cd /Users/hllj/Projects/long-live-wiki && python -m pytest skills/wiki-ingest/tools/tests/ -v
 ```
-Expected: `19 passed`, 0 failures.
+Expected: `26 passed`, 0 failures.
 
 ---
 
@@ -734,24 +561,19 @@ Expected: `19 passed`, 0 failures.
 # File not found
 python skills/wiki-ingest/tools/ingest_doc.py nonexistent.pdf
 ```
-Expected: exit 1, stderr contains `Error: file not found: nonexistent.pdf`
+Expected: exit 1, `Error: file not found: nonexistent.pdf`
 
 ```bash
 # Missing GEMINI_API_KEY
 unset GEMINI_API_KEY && python skills/wiki-ingest/tools/enhance_images.py /dev/null /tmp
 ```
-Expected: exit 1, stderr contains `Error: GEMINI_API_KEY environment variable not set`
+Expected: exit 1, `Error: GEMINI_API_KEY environment variable not set`
 
 ```bash
-# Output exists, no --force (attention.pdf → raw/attention.md if that exists, else use sentinel)
-touch raw/force-test-sentinel.md
-python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug force-test-sentinel
+# doc_to_markdown.py requires --workdir
+python skills/wiki-ingest/tools/doc_to_markdown.py raw/attention.pdf
 ```
-Expected: exit 1, stderr contains `already exists. Use --force to overwrite.`
-
-```bash
-rm raw/force-test-sentinel.md
-```
+Expected: exit non-zero, argparse error about missing `--workdir`
 
 ---
 
@@ -762,46 +584,65 @@ rm raw/force-test-sentinel.md
 export GEMINI_API_KEY=<your-key>
 cd /Users/hllj/Projects/long-live-wiki
 
-# Run full pipeline on the existing fixture
 python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug attention-test --force
 ```
 
-Verify each AC:
-
+**Folder structure check (AC-1.4):**
 ```bash
-# AC-1.1: exits 0
-echo "Exit code: $?"
+ls raw/attention-test/
+# Expected: step1_mineru_raw.md  images/  step2_enhanced.md  ingest.log
 
-# AC-1.2: output file exists
+ls raw/attention-test/images/ | head -5
+# Expected: extracted image files
+
 ls raw/attention-test.md
-
-# AC-1.3: contains text (expect > 50 lines)
-wc -l raw/attention-test.md
-
-# AC-1.4: contains figure descriptions
-grep "Figure description (Gemini)" raw/attention-test.md | head -5
-
-# AC-1.5: summary line in stdout (check terminal output for "Images found:")
-
-# AC-2.2: re-run without --force triggers guard
-python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug attention-test
-# Expected: exit 1, "already exists"
-
-# AC-4.1: custom slug
-python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug my-attention --force
-ls raw/my-attention.md
-
-# AC-4.2: default slug derived from filename
-python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --force
-ls raw/attention.md
-
-# AC-1.7: wiki-ingest skips Step 0 for plain markdown
-# (manual: invoke wiki-ingest on raw/attention.md — confirm no "Step 0" output)
+# Expected: file exists (AC-1.5)
 ```
 
-Clean up test outputs:
+**Content checks:**
 ```bash
-rm -f raw/attention-test.md raw/my-attention.md
+# AC-1.4 step1 contains raw MinerU markdown
+wc -l raw/attention-test/step1_mineru_raw.md   # expect > 50 lines
+
+# AC-1.5 final .md contains figure descriptions
+grep "Figure description (Gemini)" raw/attention-test.md | head -5
+
+# FR-5.5 ingest.log created and contains run metadata
+cat raw/attention-test/ingest.log
+# Expected: "=== Run ...", "document: attention.pdf", "elapsed_s: ..."
+```
+
+**Idempotency checks (AC-2.1–2.3):**
+```bash
+# AC-2.1: re-run without --force shows folder inspection report
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug attention-test
+# Expected: prints "Intermediate folder already exists: raw/attention-test/"
+# with ✓ marks for step1, images, step2; prompts "Re-run Step 0 and overwrite? [y/N]"
+
+# AC-2.2: answering 'n' reuses step2 (fast, no MinerU/Gemini calls)
+# Answer 'n' at the prompt — should skip to promotion in <1s
+
+# AC-2.3: --force re-runs everything
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug attention-test --force
+# Expected: full MinerU + Gemini run, ingest.log still has only 1 entry (overwritten)
+cat raw/attention-test/ingest.log
+# Expected: only one "=== Run" entry
+```
+
+**Partial resume (AC-2.2 edge case):**
+```bash
+# Simulate step1 present but step2 missing
+cp raw/attention-test/step1_mineru_raw.md /tmp/step1_backup.md
+rm raw/attention-test/step2_enhanced.md
+
+python skills/wiki-ingest/tools/ingest_doc.py raw/attention.pdf --slug attention-test
+# Expected: reports "step2_enhanced.md (missing)", offers "Resume from Gemini only? [Y/n]"
+# Answer 'Y' — only Gemini enrichment runs (no MinerU)
+```
+
+Clean up:
+```bash
+rm -rf raw/attention-test/ raw/attention-test.md
 ```
 
 ---
@@ -811,17 +652,16 @@ rm -f raw/attention-test.md raw/my-attention.md
 ### T11.5 — Add Step 0 pre-process block to `skills/wiki-ingest/SKILL.md`
 **File:** `skills/wiki-ingest/SKILL.md`
 **Implements:** FR-6
-**Covers:** AC-1.1 – AC-1.7, AC-2.1 – AC-2.2, AC-3.1 – AC-3.2
 
-Insert the following block immediately before the `### 1. Read the source` section:
+Insert immediately before the `### 1. Read the source` section (exact content in plan.md Phase 4.5):
 
 ```markdown
 ### 0. Pre-process document (binary sources only)
 
 Check the file extension of the source path the user provided.
 
-- If the extension is **`.pdf` or `.docx`**: run Step 0 before anything else.
-- If the extension is **`.md`** (or no extension / already markdown): skip to Step 1.
+- If **`.pdf` or `.docx`**: run Step 0 before anything else.
+- If **`.md`** (or already markdown): skip to Step 1.
 
 **Running Step 0:**
 
@@ -830,20 +670,27 @@ export GEMINI_API_KEY=<your-key>
 python skills/wiki-ingest/tools/ingest_doc.py <source_path> [--slug <slug>] [--gemini-model <model>]
 ```
 
-Display the full stdout output (images found, described, failures).
+The script streams live output: `[MinerU]` conversion lines, then per-image `[Gemini] Describing figure N/M: ...` lines. Let all output stream through — do not suppress it.
 
-After displaying the summary, ask the user:
+If the intermediate folder `raw/<slug>/` already exists, the script shows a folder inspection report and prompts whether to re-run or reuse. Follow the user's answer.
 
-> "Pre-processing complete. Proceed with wiki ingest? [y/n]"
+After the script completes, it prints a summary:
+```
+Step 0 complete
+Intermediate artifacts saved to: raw/<slug>/
+Final enriched markdown:         raw/<slug>.md
+```
 
-- **If yes:** the enriched markdown at `raw/<slug>.md` is now the source for Step 1 onward.
-- **If no:** stop here — do not write any wiki pages.
-- **If the script exits non-zero (fatal error):** report the error and stop — do not write any wiki pages.
+Ask the user: **"Pre-processing complete. Proceed with wiki ingest? [y/n]"**
+
+- **Yes:** use `raw/<slug>.md` as the source for Step 1 onward.
+- **No:** stop — do not write any wiki pages.
+- **Script exits non-zero (fatal error):** report the error and stop.
 ```
 
 **Verify:**
-- Invoke wiki-ingest skill pointing at a `.pdf` source → confirm "Step 0: Pre-processing" fires.
-- Invoke wiki-ingest skill pointing at a `.md` source → confirm Step 0 is skipped.
+- Invoke wiki-ingest on a `.pdf` → Step 0 fires, streams output, asks confirmation.
+- Invoke wiki-ingest on a `.md` → Step 0 is skipped entirely.
 
 ---
 
@@ -855,15 +702,17 @@ cd /Users/hllj/Projects/long-live-wiki
 git add skills/wiki-ingest/ docs/specs/003-doc-ingest-pipeline/
 git status
 ```
-Expected: shows `skills/wiki-ingest/tools/` (new files) and `skills/wiki-ingest/SKILL.md` (modified) and `docs/specs/003-doc-ingest-pipeline/` as modified files.
+Expected: `skills/wiki-ingest/tools/` (new files), `skills/wiki-ingest/SKILL.md` (modified), `docs/specs/003-doc-ingest-pipeline/` (modified).
 
 ```bash
 git commit -m "$(cat <<'EOF'
-feat(wiki-ingest): add document ingest pipeline inside skill, integrate Step 0 pre-process
+feat(wiki-ingest): add document ingest pipeline with intermediate folder layout and live logging
 
-Moves pipeline tools into skills/wiki-ingest/tools/ so the skill is
-self-contained. wiki-ingest now detects binary sources (PDF, DOCX) and
-runs MinerU + Gemini enrichment as Step 0 before writing any wiki pages.
+Implements spec v3.1.0: binary sources (PDF/DOCX) go through MinerU +
+Gemini enrichment as Step 0. Each stage writes to raw/<slug>/ so all
+intermediate artifacts are inspectable. Sub-steps stream live progress
+(per-image [Gemini] lines, heartbeat for MinerU silence) so users are
+never waiting in silence. ingest.log records every run.
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 EOF
