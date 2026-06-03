@@ -8,6 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import ingest_doc
 
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+
 
 # ---------------------------------------------------------------------------
 # slugify
@@ -127,7 +129,7 @@ def test_cli_file_not_found():
         [sys.executable, "skills/wiki-ingest/tools/ingest_doc.py", "no_such_file.pdf"],
         capture_output=True,
         text=True,
-        cwd="/Users/hllj/Projects/long-live-wiki",
+        cwd=str(REPO_ROOT),
     )
     assert result.returncode == 1
     assert "Error: file not found" in result.stderr

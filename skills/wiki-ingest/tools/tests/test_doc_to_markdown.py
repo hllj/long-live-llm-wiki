@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import doc_to_markdown
 
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+
 
 def _make_popen_mock(lines: list[str], returncode: int = 0):
     """Return a mock Popen object that yields lines and has the given returncode."""
@@ -97,7 +99,7 @@ def test_cli_file_not_found():
          "nonexistent_file.pdf", "--workdir", "/tmp/test_workdir_wd"],
         capture_output=True,
         text=True,
-        cwd="/Users/hllj/Projects/long-live-wiki",
+        cwd=str(REPO_ROOT),
     )
     assert result.returncode == 1
     assert "Error: file not found" in result.stderr
@@ -109,7 +111,7 @@ def test_cli_requires_workdir():
         [sys.executable, "skills/wiki-ingest/tools/doc_to_markdown.py", "raw/attention.pdf"],
         capture_output=True,
         text=True,
-        cwd="/Users/hllj/Projects/long-live-wiki",
+        cwd=str(REPO_ROOT),
     )
     assert result.returncode != 0
 
