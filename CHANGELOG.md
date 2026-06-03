@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.0] — 2026-06-03
+
+### Added
+
+- `wiki-ingest` **Step 0: binary document support** — PDF and DOCX sources are now automatically pre-processed via MinerU (PDF→markdown conversion) + Gemini vision (figure enrichment) before wiki integration. Step 0 runs when the source path ends in `.pdf` or `.docx`; plain `.md` sources skip directly to Step 1.
+- **Intermediate folder layout** — `raw/<slug>/` stores step-by-step artifacts (`step1_mineru_raw.md`, `step2_enhanced.md`) so Step 0 is resumable: if the folder already exists, the script inspects pipeline stage and offers to overwrite or continue from Gemini enrichment only.
+- **Live streaming output** during Step 0 — MinerU progress and per-image Gemini enrichment lines (`[Gemini] Describing figure N/M: ... done`) are printed in real time without buffering.
+- `skills/wiki-ingest/tools/ingest_doc.py` — the MinerU + Gemini processing script that drives Step 0, including a heartbeat line every 5 s when MinerU is silent.
+- **Canonical two-zone link convention** documented and enforced across all four skills: `[[Wikilinks]]` inside content pages (`entities/`, `concepts/`, `sources/`, `analyses/`); standard markdown links with `%20` encoding in navigation files (`index.md`, `log.md`).
+
+### Changed
+
+- `wiki-ingest` file naming: now enforces **Title Case with spaces** for entity/concept filenames, ensuring Obsidian wikilink resolution works (e.g. `[[Multi-Head Attention]]` → `wiki/concepts/Multi-Head Attention.md`).
+- README updated to document binary document support and the full MinerU + Gemini pipeline.
+
+### Fixed
+
+- `wiki-ingest` Step 0: resolved subprocess deadlock caused by stdout/stderr buffering when calling MinerU as a child process — output now streams correctly under all terminal conditions.
+- `wiki-ingest` Step 0: fixed re-run md selection bug where the wrong markdown file was used on subsequent runs when both step1 and step2 artifacts were present.
+
+---
+
 ## [0.5.0] — 2026-05-25
 
 ### Added
