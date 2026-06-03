@@ -98,9 +98,21 @@ When asked to health-check the wiki:
 ## Wiki page conventions
 
 - All pages use standard markdown. No special frontmatter required unless you want Dataview queries (add `tags:`, `date:`, `sources:` fields then).
-- Cross-link liberally using `[[Page Name]]` (Obsidian wikilink syntax) or standard `[text](path.md)` links.
 - Source summary pages live in `wiki/sources/`. Entity pages in `wiki/entities/`. Concept pages in `wiki/concepts/`. Analyses and query outputs in `wiki/analyses/`. Top-level overview/synthesis in `wiki/`.
 - When a new source contradicts an existing claim on a page, update that page and note the contradiction inline: `> **Note (updated YYYY-MM-DD):** [new source] contradicts the above — [brief explanation].`
+
+## Link conventions
+
+Two zones, two rules:
+
+| Zone | Files | Link style |
+|---|---|---|
+| **Content** | `entities/*.md`, `concepts/*.md`, `sources/*.md`, `analyses/*.md` | `[[Wikilinks]]` for all same-wiki cross-refs; standard markdown only for source-to-source refs (slugs are kebab-case — no encoding needed) |
+| **Navigation** | `index.md`, `log.md` | Standard markdown `[text](path.md)` only — **never** `[[Wikilinks]]`; spaces in paths must be `%20`-encoded |
+
+**Naming rule:** Entity/concept filenames use **Title Case with spaces** matching the wikilink text (e.g. `Multi-Head Attention.md`). Source filenames use **kebab-case** (e.g. `attention-is-all-you-need.md`).
+
+**Encoding rule:** `%20` encoding applies only to `index.md` entries — it is the one place where standard markdown links point to filenames that contain spaces. Inside content pages, use `[[Wikilinks]]` instead.
 
 ## Index format
 

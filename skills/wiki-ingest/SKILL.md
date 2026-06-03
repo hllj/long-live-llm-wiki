@@ -115,7 +115,7 @@ This is the most important step. Work through the pages flagged by qmd's impact 
 
 Cross-link liberally using `[[Page Name]]` or `[text](path.md)` links. Every page you touch should link to the new source summary, and the source summary should link back to every page it touches.
 
-> **Naming rule:** Entity/concept filenames use **Title Case with spaces** matching the wikilink text (e.g. `Transformer.md`, `Multi-Head Attention.md`). Source summary filenames use **kebab-case** (e.g. `attention-is-all-you-need.md`) and are referenced with path links, not wikilinks.
+> Follow the **Link conventions** in `CLAUDE.md`: use `[[Wikilinks]]` for all cross-refs inside content pages; add new entries to `wiki/index.md` as standard markdown links with `%20` for any spaces in the path.
 
 A single source typically touches 5–15 pages. That's expected.
 

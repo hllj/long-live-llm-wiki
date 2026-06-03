@@ -91,6 +91,16 @@ If two pages both score high for the same query but neither links to the other, 
 
 Topics where qmd returns low scores (< 0.3) or thin snippets. These are candidates for new sources to ingest.
 
+**Link hygiene**
+
+Check `wiki/index.md` for two violations of the link conventions in `CLAUDE.md`:
+- Any `[[Wikilink]]` appearing in `index.md` — wikilinks must not appear in the navigation zone; replace with a standard markdown link
+- Any standard markdown link whose path contains an unencoded space (e.g. `](concepts/Multi-Head Attention.md)` instead of `](concepts/Multi-Head%20Attention.md)`) — fix by percent-encoding spaces as `%20`
+
+**Orphan duplicates**
+
+Flag files where a shorter/variant name exists alongside a canonical Title-Case name (e.g. `BLEU.md` alongside `BLEU Score.md`, `Multi-Head.md` alongside `Multi-Head Attention.md`). Verify no inbound links point to the variant before recommending deletion.
+
 **Log gaps**
 
 Check `wiki/log.md` for anything inconsistent with the index. Pages mentioned in the log but absent from the index, or index pages with no log entry, indicate bookkeeping drift.
