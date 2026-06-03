@@ -10,6 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import enhance_images
 
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+
 
 def test_enrich_inserts_description_after_image(tmp_path):
     """enrich() appends a blockquote description immediately after each image line."""
@@ -148,7 +150,7 @@ def test_cli_missing_api_key(tmp_path):
         capture_output=True,
         text=True,
         env=env,
-        cwd="/Users/hllj/Projects/long-live-wiki",
+        cwd=str(REPO_ROOT),
     )
 
     assert result.returncode == 1
