@@ -11,7 +11,7 @@ See [EXAMPLES.md](./EXAMPLES.md) for real use cases and workflows you can follow
 ## Features
 
 - **Initialize**: Declare your wiki's topic, back up any existing content, clean out example pages, scaffold entity/concept stubs, and prepare the repo for production — all in one guided flow.
-- **Ingest**: Drop any source (PDF, markdown, article) into `raw/` and ask Claude to process it. It writes a summary page, updates all related entity and concept pages, and re-indexes everything.
+- **Ingest**: Drop any source (PDF, DOCX, or markdown) into `raw/` and ask Claude to process it. Binary documents are automatically converted via MinerU and enriched with Gemini vision figure descriptions (Step 0) before wiki integration. Claude then writes a summary page, updates all related entity and concept pages, and re-indexes everything.
 - **Query**: Ask questions; Claude searches the wiki with hybrid BM25/vector search, synthesizes an answer with citations, and can file valuable responses as new wiki pages. When the wiki has a gap (score < 0.3), Claude automatically runs a web search, lets you pick a source, saves it to `raw/`, triggers ingest, and re-queries — no extra commands needed.
 - **Lint**: Periodically health-check the wiki for contradictions, orphan pages, stale claims, and missing cross-references.
 - **Skills**: Four purpose-built Claude Code skills (`wiki-init`, `wiki-ingest`, `wiki-query`, `wiki-lint`) encode the exact workflows so Claude stays consistent across sessions.
@@ -22,7 +22,12 @@ See [EXAMPLES.md](./EXAMPLES.md) for real use cases and workflows you can follow
 ```
 .
 ├── raw/                    # Immutable source documents (PDFs, markdown, images)
-│   └── .gitkeep
+│   ├── <slug>.pdf          # Original binary source (never modified)
+│   ├── <slug>/             # Intermediate work folder created by Step 0
+│   │   ├── step1_mineru_raw.md   # Raw MinerU output
+│   │   ├── images/               # Figures extracted from the document
+│   │   └── step2_enhanced.md     # Markdown after Gemini figure descriptions
+│   └── <slug>.md           # Final enriched artifact promoted from step2_enhanced.md
 ├── wiki/                   # LLM-generated markdown pages (Claude owns this)
 │   ├── index.md            # Content catalog — one entry per page
 │   ├── log.md              # Append-only activity log
@@ -47,6 +52,19 @@ See [EXAMPLES.md](./EXAMPLES.md) for real use cases and workflows you can follow
 ```bash
 npm install -g @tobilu/qmd
 ```
+
+**For binary document ingestion (PDF/DOCX):**
+
+- Python 3.10+
+- [MinerU](https://github.com/opendatalab/MinerU) Pro 2.5 — PDF/DOCX → markdown conversion
+- [Google Gemini API key](https://aistudio.google.com/) — figure description enrichment
+
+```bash
+pip install -r skills/wiki-ingest/tools/requirements.txt
+export GEMINI_API_KEY=<your-key>
+```
+
+Markdown-only ingestion works without these dependencies.
 
 ## Setup
 
@@ -93,7 +111,9 @@ Drop a file into `raw/`, then in Claude Code:
 process raw/my-paper.pdf
 ```
 
-Claude reads the source, writes `wiki/sources/<slug>.md`, updates all relevant entity and concept pages, refreshes the index, and logs the activity.
+For **PDF or DOCX** sources, Claude automatically runs Step 0 first: converts the document via MinerU, extracts all figures, and calls Gemini vision to generate a description for each one. Intermediate artifacts land in `raw/<slug>/` so you can inspect or debug any stage. After Step 0 completes, Claude asks for confirmation before writing any wiki pages.
+
+For **markdown** sources, Step 0 is skipped. Claude reads the source directly, writes `wiki/sources/<slug>.md`, updates all relevant entity and concept pages, refreshes the index, and logs the activity.
 
 ### Ask a question
 
@@ -113,12 +133,12 @@ Claude checks index health, hunts for contradictions, orphan pages, and missing 
 
 ## Skills
 
-The three Claude Code skills are in `skills/` and also mirrored in `.claude-plugin/`. They encode precise workflows so Claude is consistent across sessions:
+The four Claude Code skills are in `skills/`. They encode precise workflows so Claude is consistent across sessions:
 
 | Skill | Trigger | What it does |
 |---|---|---|
 | `wiki-init` | "init the wiki", "start a new wiki", "prepare for production" | Guided setup: collect topic → backup → update `.gitignore` → clean example content → create stubs → reset index/log → rebuild index |
-| `wiki-ingest` | "ingest this", "process raw/…" | Full ingest: read → impact score → summarize → update pages → re-index → log |
+| `wiki-ingest` | "ingest this", "process raw/…" | Binary doc: Step 0 (MinerU convert → Gemini figure descriptions → confirm) → then: read → impact score → summarize → update pages → re-index → log |
 | `wiki-query` | Any question about wiki content | Search → synthesize → cite → gap detected? → web-search → ingest → re-query |
 | `wiki-lint` | "lint the wiki", "health-check" | Index health → find contradictions/orphans/gaps → report → fix if asked |
 
