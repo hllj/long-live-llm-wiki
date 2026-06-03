@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.1] — 2026-06-03
+
+### Fixed
+
+- `wiki-ingest` `ingest_doc.py`: `REPO_ROOT` was derived from `__file__` location, causing `raw/` artifacts to always write into the `long-live-wiki` repo regardless of which wiki the script was invoked from. Changed to `Path.cwd()` so the script respects the caller's working directory.
+- `wiki-ingest` test suite: hardcoded absolute `cwd` (`/Users/hllj/Projects/long-live-wiki`) in all three CLI subprocess tests replaced with a portable `REPO_ROOT` computed from `__file__` (5 parents up to repo root). All 31 tests pass.
+
+---
+
 ## [0.6.0] — 2026-06-03
 
 ### Added
