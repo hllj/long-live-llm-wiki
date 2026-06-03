@@ -1,18 +1,12 @@
 ---
 name: wiki-ingest
 description: >
-  Processes a new source document into the LLM wiki. Accepts both markdown files
-  and binary documents (PDF, DOCX) — binary sources are automatically converted
-  to enriched markdown via MinerU + Gemini vision before wiki integration. Use
-  this skill whenever the user wants to add, ingest, or process a file into the
-  wiki — whether they say "ingest this", "process raw/<file>", "I dropped a
-  file in raw/", "add this article to the wiki", or any similar phrasing. Also
-  trigger when the user provides a PDF or DOCX path directly. This skill handles
-  the complete ingest workflow: optional binary pre-processing (Step 0), reading
-  the source, collaborating with the user on emphasis, using qmd to identify
-  which existing pages are most affected, writing a summary page, updating entity
-  and concept pages throughout the wiki, refreshing the index, and logging the
-  activity.
+  Processes a source document (markdown, PDF, or DOCX) into the LLM wiki.
+  Binary sources are automatically pre-processed via MinerU + Gemini vision
+  before wiki integration.
+when_to_use: >
+  Trigger when the user says "ingest", "process raw/<file>", "add this to the
+  wiki", "I dropped a file in raw/", or provides a PDF or DOCX path directly.
 ---
 
 # Wiki Ingest
@@ -105,9 +99,11 @@ This is the most important step. Work through the pages flagged by qmd's impact 
 
 - If the page exists: add new information, strengthen existing claims, or note contradictions using the inline format:
   > **Note (updated YYYY-MM-DD):** [source title](../sources/slug.md) contradicts the above — [brief explanation].
-- If the page doesn't exist but the entity/concept is significant enough to warrant its own page: create it as `wiki/entities/<name>.md` or `wiki/concepts/<topic>.md`.
+- If the page doesn't exist but the entity/concept is significant enough to warrant its own page: create it as `wiki/entities/<Name>.md` or `wiki/concepts/<Topic Name>.md`. **Use the exact wikilink text as the filename** — e.g. if you'll link as `[[Multi-Head Attention]]`, the file must be `wiki/concepts/Multi-Head Attention.md`. This is what makes Obsidian wikilinks resolve without creating orphan pages.
 
 Cross-link liberally using `[[Page Name]]` or `[text](path.md)` links. Every page you touch should link to the new source summary, and the source summary should link back to every page it touches.
+
+> **Naming rule:** Entity/concept filenames use **Title Case with spaces** matching the wikilink text (e.g. `Transformer.md`, `Multi-Head Attention.md`). Source summary filenames use **kebab-case** (e.g. `attention-is-all-you-need.md`) and are referenced with path links, not wikilinks.
 
 A single source typically touches 5–15 pages. That's expected.
 

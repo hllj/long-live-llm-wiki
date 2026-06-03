@@ -1,7 +1,7 @@
 # Feature 003: wiki-ingest Binary Document Support
 
 **Status:** Approved
-**Version:** 3.0.0
+**Version:** 3.1.0
 **Created:** 2026-06-03
 **Updated:** 2026-06-03
 **Branch:** `003-doc-ingest-pipeline`
@@ -122,6 +122,13 @@ The missing capability: `wiki-ingest` should accept binary documents directly an
 - FR-4.2: Original image reference lines are preserved unchanged.
 - FR-4.3: The enriched markdown is written to `raw/<slug>.md`.
 
+### FR-7: Obsidian wikilink compatibility *(naming convention)*
+
+- FR-7.1: Entity and concept page filenames **must** match the wikilink text exactly. If a page is linked as `[[Multi-Head Attention]]`, the file must be `wiki/concepts/Multi-Head Attention.md`. Obsidian resolves `[[X]]` by looking for a file named `X.md`; hyphens and spaces are not interchangeable.
+- FR-7.2: Entity and concept files use **Title Case with spaces** (e.g. `Transformer.md`, `Multi-Head Attention.md`, `Self-Attention.md`). Never use kebab-case for these files.
+- FR-7.3: Source summary files continue to use **kebab-case** (e.g. `attention-is-all-you-need.md`) and are referenced via standard path links (`[Title](../sources/slug.md)`), not wikilinks.
+- FR-7.4: When writing cross-links inside wiki pages, always use bare `[[Page Name]]` wikilinks for entity/concept pages (never piped aliases to work around a filename mismatch — fix the filename instead).
+
 ### FR-5: Internal tool contracts
 
 - FR-5.1: `doc_to_markdown.py` prints on success:
@@ -145,6 +152,7 @@ The missing capability: `wiki-ingest` should accept binary documents directly an
 - NFR-3: All tools must run in Python 3.10+ with dependencies declared in `skills/wiki-ingest/tools/requirements.txt`. Required packages: `mineru[all]`, `google-genai`.
 - NFR-4: No hardcoded API keys or secrets anywhere in the codebase.
 - NFR-5: First-run note must be surfaced — `mineru[all]` downloads model weights (~several GB) on first invocation; `skills/wiki-ingest/tools/README.md` must document the setup steps for developers (not end users).
+- NFR-6: `skills/wiki-ingest/SKILL.md` frontmatter must use the `description` + `when_to_use` split pattern: `description` holds what the skill does (≤200 chars), `when_to_use` holds trigger phrases. Combined length must stay under the 1,536-character skill listing cap to prevent the description from being dropped from Claude's context budget.
 
 ---
 
