@@ -46,7 +46,7 @@ def convert(doc_path: Path, workdir: Path) -> tuple[Path, Path]:
         sys.exit(1)
 
     # MinerU may nest output under a subdir named after the input stem; find the .md
-    md_files = sorted(f for f in workdir.rglob("*.md") if f.name != "step1_mineru_raw.md")
+    md_files = sorted(f for f in workdir.rglob("*.md") if f.name not in ("step1_mineru_raw.md", "step2_enhanced.md"))
     if not md_files:
         print(f"Error: MinerU produced no markdown output in {workdir}", file=sys.stderr)
         sys.exit(1)

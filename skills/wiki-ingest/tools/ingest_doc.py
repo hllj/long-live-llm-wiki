@@ -71,15 +71,12 @@ def write_log(workdir: Path, entry: dict, force: bool) -> None:
 
 def stream_subprocess(cmd: list[str]) -> tuple[int, str]:
     """Run cmd with Popen, stream stdout to terminal, return (returncode, full_stdout)."""
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
     lines = []
     for line in proc.stdout:
         print(line, end="", flush=True)
         lines.append(line)
-    stderr = proc.stderr.read()
     proc.wait()
-    if stderr and proc.returncode != 0:
-        print(stderr, file=sys.stderr)
     return proc.returncode, "".join(lines)
 
 
