@@ -95,6 +95,8 @@ If the best qmd score is < 0.3 **and** the index scan also turned up nothing rel
 
 ### 7. Offer to file the answer
 
+> **Link conventions:** When filing an analyses page, use `[[Wikilinks]]` for all cross-refs inside the page body. Add the new page to `wiki/index.md` as a standard markdown link with `%20` for any spaces in the path (e.g. `[My Topic](analyses/My%20Topic.md)`). See `CLAUDE.md` for the full two-zone model.
+
 If the answer is non-trivial — a comparison, an analysis, a synthesis across multiple pages, a connection the human hadn't made explicit — offer to save it as a new wiki page:
 
 > "This analysis touches on 4 different concept pages. Want me to file it as `wiki/analyses/<topic>.md` so it's part of the wiki going forward?"

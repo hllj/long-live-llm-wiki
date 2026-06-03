@@ -1,16 +1,12 @@
 ---
 name: wiki-ingest
 description: >
-  Processes a new source document into the LLM wiki. Use this skill whenever
-  the user wants to add, ingest, or process a file into the wiki — whether they
-  say "ingest this", "process raw/<file>", "I dropped a file in raw/", "add
-  this article to the wiki", or any similar phrasing. This skill handles the
-  complete ingest workflow: reading the source, collaborating with the user on
-  emphasis, using qmd to identify which existing pages are most affected,
-  writing a summary page, updating entity and concept pages throughout the wiki,
-  refreshing the index, and logging the activity. Trigger even when the user
-  only provides a file path and asks you to "process" or "read" it in context
-  of the wiki.
+  Processes a source document (markdown, PDF, or DOCX) into the LLM wiki.
+  Binary sources are automatically pre-processed via MinerU + Gemini vision
+  before wiki integration.
+when_to_use: >
+  Trigger when the user says "ingest", "process raw/<file>", "add this to the
+  wiki", "I dropped a file in raw/", or provides a PDF or DOCX path directly.
 ---
 
 # Wiki Ingest
@@ -18,6 +14,44 @@ description: >
 You are ingesting a new source document into the wiki. Your job is to extract its knowledge and weave it into the existing wiki structure — not just summarize it in isolation, but find where it connects, where it updates, and where it contradicts what's already there.
 
 ## Workflow
+
+### 0. Pre-process document (binary sources only)
+
+Check the file extension of the source path the user provided.
+
+- If the extension is **`.pdf` or `.docx`**: run Step 0 before anything else.
+- If the extension is **`.md`** (or already plain text / no extension): skip to Step 1.
+
+**Running Step 0:**
+
+```bash
+export GEMINI_API_KEY=<your-key>
+python skills/wiki-ingest/tools/ingest_doc.py <source_path> [--slug <slug>] [--gemini-model <model>]
+```
+
+Let all output stream through without suppressing it. You will see:
+- `[MinerU]` lines as conversion progresses (plus heartbeat lines if MinerU is silent >5s)
+- Per-image `[Gemini] Describing figure N/M: ... done (1.2s)` lines during enrichment
+- A final summary block:
+  ```
+  Step 0 complete — see terminal output above for image summary
+  Intermediate artifacts saved to: raw/<slug>/
+  Final enriched markdown:         raw/<slug>.md
+  ```
+
+**If the intermediate folder `raw/<slug>/` already exists**, the script shows a folder inspection report and prompts:
+- All stages complete (`step2_enhanced.md` present) → `Re-run Step 0 and overwrite? [y/N]` — answer on the user's behalf or ask them.
+- Only `step1_mineru_raw.md` present → offers to resume from Gemini enrichment only.
+
+**After the script finishes**, ask the user:
+
+> "Pre-processing complete. Proceed with wiki ingest? [y/n]"
+
+- **If yes:** use `raw/<slug>.md` as the source for Step 1 onward.
+- **If no:** stop here — do not write any wiki pages.
+- **If the script exits non-zero (fatal error):** report the error and stop — do not write any wiki pages.
+
+---
 
 ### 1. Read the source
 
@@ -77,9 +111,11 @@ This is the most important step. Work through the pages flagged by qmd's impact 
 
 - If the page exists: add new information, strengthen existing claims, or note contradictions using the inline format:
   > **Note (updated YYYY-MM-DD):** [source title](../sources/slug.md) contradicts the above — [brief explanation].
-- If the page doesn't exist but the entity/concept is significant enough to warrant its own page: create it as `wiki/entities/<name>.md` or `wiki/concepts/<topic>.md`.
+- If the page doesn't exist but the entity/concept is significant enough to warrant its own page: create it as `wiki/entities/<Name>.md` or `wiki/concepts/<Topic Name>.md`. **Use the exact wikilink text as the filename** — e.g. if you'll link as `[[Multi-Head Attention]]`, the file must be `wiki/concepts/Multi-Head Attention.md`. This is what makes Obsidian wikilinks resolve without creating orphan pages.
 
 Cross-link liberally using `[[Page Name]]` or `[text](path.md)` links. Every page you touch should link to the new source summary, and the source summary should link back to every page it touches.
+
+> Follow the **Link conventions** in `CLAUDE.md`: use `[[Wikilinks]]` for all cross-refs inside content pages; add new entries to `wiki/index.md` as standard markdown links with `%20` for any spaces in the path.
 
 A single source typically touches 5–15 pages. That's expected.
 
