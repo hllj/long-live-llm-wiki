@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.0] — 2026-06-05
+
+### Added
+
+- `wiki-ingest` now auto-starts a persistent `mineru-api` server (port 8765, `--enable-vlm-preload True`) on first PDF ingest and reuses it for all subsequent ingests in the same machine session via `--api-url`. Eliminates the 30–60s VLM model-loading overhead on Apple M1 for every ingest after the first.
+- `doc_to_markdown.py`: new `ensure_server()` function with full fallback logic — if `mineru-api` is not in PATH, startup times out (90s), or all candidate ports (8765–8768) are occupied, the script falls back to local mode transparently.
+- Server logs written to `~/.mineru-api.log`; PID written to `~/.mineru-api.pid` (informational).
+- `MINERU_API_PORT` and `MINERU_API_PID_FILE` environment variables for test isolation and custom configurations.
+
+---
+
 ## [0.6.1] — 2026-06-03
 
 ### Fixed
