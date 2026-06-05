@@ -39,6 +39,8 @@ Let all output stream through without suppressing it. You will see:
   Final enriched markdown:         raw/<slug>.md
   ```
 
+> MinerU runs as a background server (auto-started on first use, port 8765); model weights load once per machine session, making subsequent ingests ~60s faster on Apple M1.
+
 **If the intermediate folder `raw/<slug>/` already exists**, the script shows a folder inspection report and prompts:
 - All stages complete (`step2_enhanced.md` present) → `Re-run Step 0 and overwrite? [y/N]` — answer on the user's behalf or ask them.
 - Only `step1_mineru_raw.md` present → offers to resume from Gemini enrichment only.
