@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.8.0] — 2026-06-09
+
+### Fixed
+
+- `wiki-ingest` Step 0: `ingest_doc.py` was referenced as `skills/wiki-ingest/tools/ingest_doc.py` (relative to the project root), which failed with "No such file or directory" when running from any wiki project other than `long-live-wiki`. Step 0 now resolves the script via `find ~/.claude/plugins/cache/llm-wiki-local -name "ingest_doc.py"` — locating it from the installed plugin cache — so it works from any project with the `llm-wiki` plugin installed.
+
+### Changed
+
+- Plugin bumped to `0.8.0` to force a re-cache from the corrected source directory (`long-live-wiki`), ensuring the `tools/` directory is included alongside `SKILL.md` in the plugin cache.
+
+---
+
 ## [0.7.0] — 2026-06-05
 
 ### Added

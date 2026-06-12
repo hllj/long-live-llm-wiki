@@ -24,9 +24,12 @@ Check the file extension of the source path the user provided.
 
 **Running Step 0:**
 
+Locate `ingest_doc.py` from the plugin cache (works from any project):
+
 ```bash
+INGEST_SCRIPT=$(find ~/.claude/plugins/cache/llm-wiki-local -name "ingest_doc.py" 2>/dev/null | sort -r | head -1)
 export GEMINI_API_KEY=<your-key>
-python skills/wiki-ingest/tools/ingest_doc.py <source_path> [--slug <slug>] [--gemini-model <model>]
+python "$INGEST_SCRIPT" <source_path> [--slug <slug>] [--gemini-model <model>]
 ```
 
 Let all output stream through without suppressing it. You will see:
